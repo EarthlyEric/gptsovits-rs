@@ -237,6 +237,66 @@ async fn test_create_speech_with_dynamic_voice_object() {
 }
 
 #[tokio::test]
+async fn test_create_speech_with_segmented_text_methods() {
+    let app = setup_test_app();
+
+    // 1. Voice preset with default cut2 (fable)
+    let req_body_fable = json!({
+        "model": "gpt-sovits-v2",
+        "input": "First clause. Second clause, third clause! Fourth clause? Fifth clause.",
+        "voice": "fable",
+        "response_format": "wav"
+    });
+
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/speech")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::AUTHORIZATION, "Bearer test-secret-token")
+                .body(Body::from(req_body_fable.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // 2. Dynamic voice object with explicit cut1
+    let req_body_cut1 = json!({
+        "model": "gpt-sovits-v2",
+        "input": "第一句話。第二句話，第三句話！第四句話？第五句話。第六句話。",
+        "voice": {
+            "ref_audio_path": "",
+            "prompt_text": "提示文本",
+            "prompt_lang": "zh",
+            "text_lang": "zh",
+            "model_version": "v2",
+            "text_split_method": "cut1",
+            "fragment_interval": 0.15
+        },
+        "response_format": "wav"
+    });
+
+    let response_cut1 = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/speech")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::AUTHORIZATION, "Bearer test-secret-token")
+                .body(Body::from(req_body_cut1.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response_cut1.status(), StatusCode::OK);
+}
+
+#[tokio::test]
 async fn test_empty_input_returns_400() {
     let app = setup_test_app();
 

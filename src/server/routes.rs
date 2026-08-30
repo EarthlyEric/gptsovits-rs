@@ -87,6 +87,8 @@ pub async fn create_speech(
         prompt_lang: voice_preset.prompt_lang.clone(),
         ref_audio,
         ref_sr,
+        text_split_method: voice_preset.text_split_method.clone(),
+        fragment_interval: voice_preset.fragment_interval,
         top_k: voice_preset.top_k,
         top_p: voice_preset.top_p,
         temperature: voice_preset.temperature,

@@ -15,6 +15,10 @@ pub struct VoicePreset {
     pub text_lang: String,
     #[serde(default = "default_model_version")]
     pub model_version: String,
+    #[serde(default = "default_split_method")]
+    pub text_split_method: String,
+    #[serde(default = "default_fragment_interval")]
+    pub fragment_interval: f32,
     #[serde(default = "default_top_k")]
     pub top_k: usize,
     #[serde(default = "default_top_p")]
@@ -31,6 +35,14 @@ fn default_lang() -> String {
 
 fn default_model_version() -> String {
     "v2".to_string()
+}
+
+fn default_split_method() -> String {
+    "cut5".to_string()
+}
+
+fn default_fragment_interval() -> f32 {
+    0.2
 }
 
 fn default_top_k() -> usize {
@@ -125,6 +137,8 @@ impl Default for VoiceManager {
             prompt_lang: "zh".to_string(),
             text_lang: "zh".to_string(),
             model_version: "v2".to_string(),
+            text_split_method: "cut5".to_string(),
+            fragment_interval: 0.2,
             top_k: 15,
             top_p: 1.0,
             temperature: 1.0,
@@ -133,11 +147,18 @@ impl Default for VoiceManager {
         voices.insert("default".to_string(), default_preset.clone());
         voices.insert("alloy".to_string(), default_preset.clone());
         voices.insert("echo".to_string(), default_preset.clone());
-        voices.insert("fable".to_string(), default_preset.clone());
+        voices.insert("fable".to_string(), VoicePreset {
+            text_split_method: "cut2".to_string(),
+            ..default_preset.clone()
+        });
         voices.insert("onyx".to_string(), default_preset.clone());
         voices.insert("nova".to_string(), default_preset.clone());
         voices.insert("shimmer".to_string(), default_preset.clone());
-        voices.insert("sandrone".to_string(), default_preset);
+        voices.insert("sandrone".to_string(), VoicePreset {
+            model_version: "v2ProPlus".to_string(),
+            text_split_method: "cut5".to_string(),
+            ..default_preset
+        });
 
         Self { voices }
     }

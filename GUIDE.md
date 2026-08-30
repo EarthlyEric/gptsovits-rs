@@ -153,7 +153,7 @@ sampling_rate = 32000
 
 ### 4.2 音色預設 (`voices.toml`)
 
-定義 OpenAI 標準音色（`alloy`, `echo`, `shimmer` 等）與自訂角色音色對應之參考音訊與提示詞：
+定義 OpenAI 標準音色（`alloy`, `echo`, `shimmer` 等）與自訂角色音色對應之參考音訊、提示詞與文字切分策略：
 
 ```toml
 [voices.alloy]
@@ -162,6 +162,21 @@ prompt_text = "Hello, this is a clear and natural voice demonstration."
 prompt_lang = "en"
 text_lang = "en"
 model_version = "v2"
+text_split_method = "cut5"      # 👈 cut0(不切), cut1(湊4句), cut2(湊50字), cut3(按。切), cut4(按.切), cut5(按標點切)
+fragment_interval = 0.2         # 句間自然停頓時間 (秒)
+top_k = 15
+top_p = 1.0
+temperature = 1.0
+repetition_penalty = 1.35
+
+[voices.fable]
+ref_audio_path = "voices/fable/ref.wav"
+prompt_text = "Fable brings an expressive and narrative storytelling tone."
+prompt_lang = "en"
+text_lang = "en"
+model_version = "v2"
+text_split_method = "cut2"      # 👈 適合長文故事朗讀 (湊 50 字切分)
+fragment_interval = 0.3
 top_k = 15
 top_p = 1.0
 temperature = 1.0
@@ -173,11 +188,21 @@ prompt_text = "我是「木偶」桑多涅。不必多言，做好你分内的�
 prompt_lang = "zh"
 text_lang = "zh"
 model_version = "v2ProPlus"
+text_split_method = "cut5"      # 👈 對話推薦 (按所有標點符號切分，首字延遲最低)
+fragment_interval = 0.2
 top_k = 15
 top_p = 1.0
 temperature = 1.0
 repetition_penalty = 1.35
 ```
+
+#### 切分策略詳細說明 (`text_split_method`)
+- **`cut5` (預設推薦)**：按所有標點符號切分（`，` `。` `？` `！` `、` `…` 等），首字延遲最低，適合聊天對話與即時串流。
+- **`cut1`**：湊四句一切（以標點切分後每 4 句一組合成），兼顧上下文連貫性。
+- **`cut2`**：湊 50 字一切（累計到約 50 字才切分，最後短句自動向前合併），故事朗讀、有聲書推薦。
+- **`cut3`**：僅按中文句號 `。` 切分。
+- **`cut4`**：僅按英文句號 `.` 切分（自動保護如 `3.14` 小數點不被截斷）。
+- **`cut0`**：不切分（整段文字一次性合成，僅適合短句 < 25 字）。
 
 ---
 

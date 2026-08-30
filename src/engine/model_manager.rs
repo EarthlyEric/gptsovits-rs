@@ -10,7 +10,7 @@ use crate::engine::t2s::T2SModel;
 use crate::engine::types::{InferenceRequest, InferenceResult, ModelVersion};
 use crate::engine::vits_v1_v2::VitsV1V2Model;
 use crate::text::{
-    align_bert_to_phones, cleaned_text_to_sequence, text_to_phonemes, BertTokenizer,
+    align_bert_to_phones, cleaned_text_to_sequence, segment_text, text_to_phonemes, BertTokenizer,
 };
 
 pub struct CustomModelInstance {
@@ -281,7 +281,7 @@ impl ModelManager {
         self.synthesize(req, base_version)
     }
 
-    /// Synthesize with a custom fine-tuned model instance
+    /// Synthesize with a custom fine-tuned model instance (with text segmentation)
     fn synthesize_with_custom(
         &self,
         req: &InferenceRequest,
@@ -290,25 +290,7 @@ impl ModelManager {
         let sym_version = custom.version.symbols_version();
         let target_sr = custom.sampling_rate;
 
-        // 1. Target Text G2P & BERT
-        let (text_phones, text_word2ph, text_norm) = text_to_phonemes(&req.text, &req.text_lang, sym_version);
-        let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
-
-        let text_bert = if let Some(tok) = &self.tokenizer {
-            if let Ok((ids, mask, types)) = tok.encode(&text_norm) {
-                if let Ok(char_bert) = self.roberta.extract(&ids, &mask, &types) {
-                    align_bert_to_phones(Some(&char_bert), &text_word2ph, text_phones.len())
-                } else {
-                    align_bert_to_phones(None, &text_word2ph, text_phones.len())
-                }
-            } else {
-                align_bert_to_phones(None, &text_word2ph, text_phones.len())
-            }
-        } else {
-            align_bert_to_phones(None, &text_word2ph, text_phones.len())
-        };
-
-        // 2. Prompt Text G2P & BERT
+        // 1. Prompt Text G2P & BERT
         let prompt_text = if req.prompt_text.trim().is_empty() {
             "你好"
         } else {
@@ -332,7 +314,7 @@ impl ModelManager {
             align_bert_to_phones(None, &ref_word2ph, ref_phones.len())
         };
 
-        // 3. Audio Preprocessing
+        // 2. Reference Audio Preprocessing & SSL Extraction
         let ref_audio = if req.ref_audio.is_empty() {
             vec![0.0f32; (req.ref_sr as f32 * 1.5) as usize]
         } else {
@@ -341,37 +323,68 @@ impl ModelManager {
 
         let ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
         let ref_audio_tgt_sr = resample(&ref_audio, req.ref_sr as usize, target_sr as usize)?;
-
-        // 4. SSL Feature Extraction
         let ssl_content = self.cnhubert.extract(&ref_audio_16k)?;
 
-        // 5. T2S Autoregressive Generation using Custom T2S Model
-        let pred_semantic = custom.t2s.generate(
-            &ref_seq,
-            &text_seq,
-            &ref_bert,
-            &text_bert,
-            &ssl_content,
-            req.top_k,
-            req.top_p,
-            req.temperature,
-            req.repetition_penalty,
-        )?;
+        // 3. Text Segmentation
+        let segments = segment_text(&req.text, &req.text_split_method);
+        let mut all_samples = Vec::new();
 
-        // 6. Synthesis using Custom Synthesizer
-        let raw_samples = if let Some(vits) = &custom.vits {
-            vits.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr)?
-        } else if let Some(cfm) = &custom.cfm {
-            cfm.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr, req.sample_steps)?
+        let pause_samples = if req.fragment_interval > 0.0 {
+            vec![0.0f32; (target_sr as f32 * req.fragment_interval) as usize]
         } else {
-            return Err(anyhow!("Custom model has neither VITS nor CFM synthesizer"));
+            Vec::new()
         };
 
-        // 7. Speed Adjustment
+        for (seg_idx, segment) in segments.iter().enumerate() {
+            if seg_idx > 0 && !pause_samples.is_empty() {
+                all_samples.extend_from_slice(&pause_samples);
+            }
+
+            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(segment, &req.text_lang, sym_version);
+            let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
+
+            let text_bert = if let Some(tok) = &self.tokenizer {
+                if let Ok((ids, mask, types)) = tok.encode(&text_norm) {
+                    if let Ok(char_bert) = self.roberta.extract(&ids, &mask, &types) {
+                        align_bert_to_phones(Some(&char_bert), &text_word2ph, text_phones.len())
+                    } else {
+                        align_bert_to_phones(None, &text_word2ph, text_phones.len())
+                    }
+                } else {
+                    align_bert_to_phones(None, &text_word2ph, text_phones.len())
+                }
+            } else {
+                align_bert_to_phones(None, &text_word2ph, text_phones.len())
+            };
+
+            let pred_semantic = custom.t2s.generate(
+                &ref_seq,
+                &text_seq,
+                &ref_bert,
+                &text_bert,
+                &ssl_content,
+                req.top_k,
+                req.top_p,
+                req.temperature,
+                req.repetition_penalty,
+            )?;
+
+            let seg_samples = if let Some(vits) = &custom.vits {
+                vits.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr)?
+            } else if let Some(cfm) = &custom.cfm {
+                cfm.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr, req.sample_steps)?
+            } else {
+                return Err(anyhow!("Custom model has neither VITS nor CFM synthesizer"));
+            };
+
+            all_samples.extend(seg_samples);
+        }
+
+        // 4. Speed Adjustment on combined waveform
         let processed_samples = if (req.speed - 1.0).abs() > 1e-4 {
-            adjust_speed(&raw_samples, req.speed, target_sr)?
+            adjust_speed(&all_samples, req.speed, target_sr)?
         } else {
-            raw_samples
+            all_samples
         };
 
         Ok(InferenceResult {
@@ -380,7 +393,7 @@ impl ModelManager {
         })
     }
 
-    /// Base Model TTS Synthesis pipeline in pure Rust
+    /// Base Model TTS Synthesis pipeline in pure Rust (with text segmentation)
     pub fn synthesize(
         &self,
         req: &InferenceRequest,
@@ -389,25 +402,7 @@ impl ModelManager {
         let sym_version = version.symbols_version();
         let target_sr = version.sampling_rate();
 
-        // 1. Target Text G2P & BERT
-        let (text_phones, text_word2ph, text_norm) = text_to_phonemes(&req.text, &req.text_lang, sym_version);
-        let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
-
-        let text_bert = if let Some(tok) = &self.tokenizer {
-            if let Ok((ids, mask, types)) = tok.encode(&text_norm) {
-                if let Ok(char_bert) = self.roberta.extract(&ids, &mask, &types) {
-                    align_bert_to_phones(Some(&char_bert), &text_word2ph, text_phones.len())
-                } else {
-                    align_bert_to_phones(None, &text_word2ph, text_phones.len())
-                }
-            } else {
-                align_bert_to_phones(None, &text_word2ph, text_phones.len())
-            }
-        } else {
-            align_bert_to_phones(None, &text_word2ph, text_phones.len())
-        };
-
-        // 2. Reference / Prompt Text G2P & BERT
+        // 1. Reference / Prompt Text G2P & BERT
         let prompt_text = if req.prompt_text.trim().is_empty() {
             "你好"
         } else {
@@ -431,7 +426,7 @@ impl ModelManager {
             align_bert_to_phones(None, &ref_word2ph, ref_phones.len())
         };
 
-        // 3. Reference Audio Preprocessing
+        // 2. Reference Audio Preprocessing & SSL Extraction
         let ref_audio = if req.ref_audio.is_empty() {
             vec![0.0f32; (req.ref_sr as f32 * 1.5) as usize]
         } else {
@@ -440,56 +435,87 @@ impl ModelManager {
 
         let ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
         let ref_audio_tgt_sr = resample(&ref_audio, req.ref_sr as usize, target_sr as usize)?;
-
-        // 4. SSL Feature Extraction
         let ssl_content = self.cnhubert.extract(&ref_audio_16k)?;
 
-        // 5. T2S Autoregressive Generation
         let t2s = self
             .t2s_models
             .get(&version)
             .ok_or_else(|| anyhow!("T2S model for {:?} not configured", version))?;
 
-        let pred_semantic = t2s.generate(
-            &ref_seq,
-            &text_seq,
-            &ref_bert,
-            &text_bert,
-            &ssl_content,
-            req.top_k,
-            req.top_p,
-            req.temperature,
-            req.repetition_penalty,
-        )?;
+        // 3. Text Segmentation
+        let segments = segment_text(&req.text, &req.text_split_method);
+        let mut all_samples = Vec::new();
 
-        // 6. Acoustic Synthesizer (VITS for v1/v2/v2Pro/v2ProPlus, CFM for v3/v4)
-        let raw_samples = match version {
-            ModelVersion::V1 | ModelVersion::V2 | ModelVersion::V2Pro | ModelVersion::V2ProPlus => {
-                let vits = self
-                    .vits_models
-                    .get(&version)
-                    .ok_or_else(|| anyhow!("VITS model for {:?} not configured", version))?;
-                vits.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr)?
-            }
-            ModelVersion::V3 | ModelVersion::V4 => {
-                let cfm = self
-                    .cfm_models
-                    .get(&version)
-                    .ok_or_else(|| anyhow!("CFM model for {:?} not configured", version))?;
-                cfm.synthesize(
-                    &text_seq,
-                    &pred_semantic,
-                    &ref_audio_tgt_sr,
-                    req.sample_steps,
-                )?
-            }
+        let pause_samples = if req.fragment_interval > 0.0 {
+            vec![0.0f32; (target_sr as f32 * req.fragment_interval) as usize]
+        } else {
+            Vec::new()
         };
 
-        // 7. Post-processing: Speed Adjustment
+        for (seg_idx, segment) in segments.iter().enumerate() {
+            if seg_idx > 0 && !pause_samples.is_empty() {
+                all_samples.extend_from_slice(&pause_samples);
+            }
+
+            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(segment, &req.text_lang, sym_version);
+            let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
+
+            let text_bert = if let Some(tok) = &self.tokenizer {
+                if let Ok((ids, mask, types)) = tok.encode(&text_norm) {
+                    if let Ok(char_bert) = self.roberta.extract(&ids, &mask, &types) {
+                        align_bert_to_phones(Some(&char_bert), &text_word2ph, text_phones.len())
+                    } else {
+                        align_bert_to_phones(None, &text_word2ph, text_phones.len())
+                    }
+                } else {
+                    align_bert_to_phones(None, &text_word2ph, text_phones.len())
+                }
+            } else {
+                align_bert_to_phones(None, &text_word2ph, text_phones.len())
+            };
+
+            let pred_semantic = t2s.generate(
+                &ref_seq,
+                &text_seq,
+                &ref_bert,
+                &text_bert,
+                &ssl_content,
+                req.top_k,
+                req.top_p,
+                req.temperature,
+                req.repetition_penalty,
+            )?;
+
+            let seg_samples = match version {
+                ModelVersion::V1 | ModelVersion::V2 | ModelVersion::V2Pro | ModelVersion::V2ProPlus => {
+                    let vits = self
+                        .vits_models
+                        .get(&version)
+                        .ok_or_else(|| anyhow!("VITS model for {:?} not configured", version))?;
+                    vits.synthesize(&text_seq, &pred_semantic, &ref_audio_tgt_sr)?
+                }
+                ModelVersion::V3 | ModelVersion::V4 => {
+                    let cfm = self
+                        .cfm_models
+                        .get(&version)
+                        .ok_or_else(|| anyhow!("CFM model for {:?} not configured", version))?;
+                    cfm.synthesize(
+                        &text_seq,
+                        &pred_semantic,
+                        &ref_audio_tgt_sr,
+                        req.sample_steps,
+                    )?
+                }
+            };
+
+            all_samples.extend(seg_samples);
+        }
+
+        // 4. Post-processing: Speed Adjustment
         let processed_samples = if (req.speed - 1.0).abs() > 1e-4 {
-            adjust_speed(&raw_samples, req.speed, target_sr)?
+            adjust_speed(&all_samples, req.speed, target_sr)?
         } else {
-            raw_samples
+            all_samples
         };
 
         Ok(InferenceResult {
