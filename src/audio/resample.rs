@@ -32,6 +32,12 @@ pub fn resample(samples: &[f32], from_sr: usize, to_sr: usize) -> Result<Vec<f32
         offset += required_in;
     }
 
+    // Remove filter delay / phase latency
+    let delay = resampler.output_delay();
+    if output.len() > delay {
+        output.drain(0..delay);
+    }
+
     // Trim tail padding to exact ratio
     let expected_len = (samples.len() as f64 * to_sr as f64 / from_sr as f64) as usize;
     if output.len() > expected_len {

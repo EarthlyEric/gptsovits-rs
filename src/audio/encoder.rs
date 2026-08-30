@@ -30,15 +30,27 @@ impl AudioFormat {
     }
 }
 
+/// Peak normalization to prevent digital clipping / harsh distortion (max target amplitude = 0.98)
+fn normalize_peak(samples: &[f32]) -> Vec<f32> {
+    let max_amp = samples.iter().fold(0.0f32, |acc, &x| acc.max(x.abs()));
+    if max_amp > 0.98 {
+        let scale = 0.98 / max_amp;
+        samples.iter().map(|&s| s * scale).collect()
+    } else {
+        samples.to_vec()
+    }
+}
+
 /// Encode single-channel f32 audio samples to the requested format
 pub fn encode_audio(samples: &[f32], sample_rate: u32, format: AudioFormat) -> Result<Vec<u8>> {
+    let normalized = normalize_peak(samples);
     match format {
-        AudioFormat::Pcm => encode_pcm_s16le(samples),
-        AudioFormat::Wav => encode_wav(samples, sample_rate),
-        AudioFormat::Mp3 => encode_ffmpeg(samples, sample_rate, "mp3", &["-c:a", "libmp3lame", "-q:a", "2"]),
-        AudioFormat::Opus => encode_ffmpeg(samples, sample_rate, "opus", &["-c:a", "libopus", "-b:a", "128k"]),
-        AudioFormat::Aac => encode_ffmpeg(samples, sample_rate, "adts", &["-c:a", "aac", "-b:a", "192k"]),
-        AudioFormat::Flac => encode_ffmpeg(samples, sample_rate, "flac", &["-c:a", "flac"]),
+        AudioFormat::Pcm => encode_pcm_s16le(&normalized),
+        AudioFormat::Wav => encode_wav(&normalized, sample_rate),
+        AudioFormat::Mp3 => encode_ffmpeg(&normalized, sample_rate, "mp3", &["-c:a", "libmp3lame", "-q:a", "2"]),
+        AudioFormat::Opus => encode_ffmpeg(&normalized, sample_rate, "opus", &["-c:a", "libopus", "-b:a", "128k"]),
+        AudioFormat::Aac => encode_ffmpeg(&normalized, sample_rate, "adts", &["-c:a", "aac", "-b:a", "192k"]),
+        AudioFormat::Flac => encode_ffmpeg(&normalized, sample_rate, "flac", &["-c:a", "flac"]),
     }
 }
 

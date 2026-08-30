@@ -120,7 +120,7 @@ impl T2SModel {
             let x_example_arr = ndarray::ArrayD::from_shape_vec(ndarray::IxDyn(&sex_dims), d_ex.to_vec())?;
 
             let mut generated_tokens = Vec::new();
-            let mut history_tokens = y_arr.as_slice().unwrap().to_vec();
+            let mut history_tokens = Vec::new();
 
             // 3. Autoregressive generation loop
             const MAX_STEPS: usize = 1500;

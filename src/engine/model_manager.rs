@@ -291,13 +291,16 @@ impl ModelManager {
         let target_sr = custom.sampling_rate;
 
         // 1. Prompt Text G2P & BERT
-        let prompt_text = if req.prompt_text.trim().is_empty() {
-            "你好"
+        let prompt_raw = req.prompt_text.trim();
+        let prompt_text = if prompt_raw.is_empty() {
+            "你好。".to_string()
+        } else if !prompt_raw.ends_with(['。', '.', '！', '!', '？', '?']) {
+            format!("{}。", prompt_raw)
         } else {
-            req.prompt_text.as_str()
+            prompt_raw.to_string()
         };
 
-        let (ref_phones, ref_word2ph, ref_norm) = text_to_phonemes(prompt_text, &req.prompt_lang, sym_version);
+        let (ref_phones, ref_word2ph, ref_norm) = text_to_phonemes(&prompt_text, &req.prompt_lang, sym_version);
         let ref_seq = cleaned_text_to_sequence(&ref_phones, sym_version);
 
         let ref_bert = if let Some(tok) = &self.tokenizer {
@@ -342,7 +345,17 @@ impl ModelManager {
                 all_samples.extend_from_slice(&pause_samples);
             }
 
-            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(segment, &req.text_lang, sym_version);
+            let seg_raw = segment.trim();
+            if seg_raw.is_empty() {
+                continue;
+            }
+            let seg_clean = if !seg_raw.ends_with(['。', '.', '！', '!', '？', '?', '，', ',']) {
+                format!("{}。", seg_raw)
+            } else {
+                seg_raw.to_string()
+            };
+
+            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(&seg_clean, &req.text_lang, sym_version);
             let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
 
             let text_bert = if let Some(tok) = &self.tokenizer {
@@ -405,13 +418,16 @@ impl ModelManager {
         let target_sr = version.sampling_rate();
 
         // 1. Reference / Prompt Text G2P & BERT
-        let prompt_text = if req.prompt_text.trim().is_empty() {
-            "你好"
+        let prompt_raw = req.prompt_text.trim();
+        let prompt_text = if prompt_raw.is_empty() {
+            "你好。".to_string()
+        } else if !prompt_raw.ends_with(['。', '.', '！', '!', '？', '?']) {
+            format!("{}。", prompt_raw)
         } else {
-            req.prompt_text.as_str()
+            prompt_raw.to_string()
         };
 
-        let (ref_phones, ref_word2ph, ref_norm) = text_to_phonemes(prompt_text, &req.prompt_lang, sym_version);
+        let (ref_phones, ref_word2ph, ref_norm) = text_to_phonemes(&prompt_text, &req.prompt_lang, sym_version);
         let ref_seq = cleaned_text_to_sequence(&ref_phones, sym_version);
 
         let ref_bert = if let Some(tok) = &self.tokenizer {
@@ -461,7 +477,17 @@ impl ModelManager {
                 all_samples.extend_from_slice(&pause_samples);
             }
 
-            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(segment, &req.text_lang, sym_version);
+            let seg_raw = segment.trim();
+            if seg_raw.is_empty() {
+                continue;
+            }
+            let seg_clean = if !seg_raw.ends_with(['。', '.', '！', '!', '？', '?', '，', ',']) {
+                format!("{}。", seg_raw)
+            } else {
+                seg_raw.to_string()
+            };
+
+            let (text_phones, text_word2ph, text_norm) = text_to_phonemes(&seg_clean, &req.text_lang, sym_version);
             let text_seq = cleaned_text_to_sequence(&text_phones, sym_version);
 
             let text_bert = if let Some(tok) = &self.tokenizer {

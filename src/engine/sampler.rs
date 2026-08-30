@@ -1,7 +1,7 @@
 use rand::distributions::WeightedIndex;
 use rand::prelude::*;
 
-/// Autoregressive token sampler with temperature, top_k, top_p, and repetition penalty
+/// Autoregressive token sampler with temperature, top_k, top_p, and sliding-window repetition penalty
 pub fn sample_next_token(
     logits: &[f32],
     history_tokens: &[i64],
@@ -12,9 +12,10 @@ pub fn sample_next_token(
 ) -> i64 {
     let mut modified_logits = logits.to_vec();
 
-    // 1. Repetition penalty
+    // 1. Sliding window repetition penalty (only penalize recent tokens to allow natural phonetic reuse)
     if (repetition_penalty - 1.0).abs() > 1e-4 {
-        for &token in history_tokens {
+        let window_start = history_tokens.len().saturating_sub(16);
+        for &token in &history_tokens[window_start..] {
             let idx = token as usize;
             if idx < modified_logits.len() {
                 let score = modified_logits[idx];
