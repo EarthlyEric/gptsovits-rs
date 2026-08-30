@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
 use std::process::{Command, Stdio};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioFormat {
+    #[default]
     Mp3,
     Opus,
     Aac,
@@ -25,12 +26,6 @@ impl AudioFormat {
             AudioFormat::Wav => "audio/wav",
             AudioFormat::Pcm => "application/octet-stream",
         }
-    }
-}
-
-impl Default for AudioFormat {
-    fn default() -> Self {
-        AudioFormat::Mp3
     }
 }
 

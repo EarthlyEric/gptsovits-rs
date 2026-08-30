@@ -233,7 +233,7 @@ impl Default for ModelsConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     #[serde(default)]
     pub server: ServerConfig,
@@ -261,16 +261,6 @@ impl Default for RuntimeConfig {
             device: default_device(),
             intra_threads: default_intra_threads(),
             inter_threads: default_inter_threads(),
-        }
-    }
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            server: ServerConfig::default(),
-            runtime: RuntimeConfig::default(),
-            models: ModelsConfig::default(),
         }
     }
 }

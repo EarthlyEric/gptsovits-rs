@@ -137,7 +137,7 @@ pub fn text_to_phonemes(
     apply_tone_sandhi(&zh_chars, &mut zh_pinyins);
 
     let mut zh_map: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
-    for (idx, py) in zh_indices.into_iter().zip(zh_pinyins.into_iter()) {
+    for (idx, py) in zh_indices.into_iter().zip(zh_pinyins) {
         zh_map.insert(idx, py);
     }
 

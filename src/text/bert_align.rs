@@ -21,18 +21,12 @@ pub fn align_bert_to_phones(
                 }
             } else {
                 // Pad with zeros if word2ph length exceeds bert char count
-                for _ in 0..repeat_count {
-                    phone_bert_data.extend(std::iter::repeat(0.0).take(BERT_DIM));
-                }
+                phone_bert_data.resize(phone_bert_data.len() + repeat_count * BERT_DIM, 0.0);
             }
         }
 
         // Pad or truncate to exact num_phones
-        let current_rows = phone_bert_data.len() / BERT_DIM;
-        if current_rows < num_phones {
-            let missing_rows = num_phones - current_rows;
-            phone_bert_data.extend(std::iter::repeat(0.0).take(missing_rows * BERT_DIM));
-        }
+        phone_bert_data.resize(num_phones * BERT_DIM, 0.0);
 
         Array2::from_shape_vec((num_phones, BERT_DIM), phone_bert_data)
             .unwrap_or_else(|_| Array2::zeros((num_phones, BERT_DIM)))

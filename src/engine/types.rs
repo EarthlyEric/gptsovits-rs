@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ModelVersion {
     V1,
+    #[default]
     V2,
     #[serde(rename = "v2Pro", alias = "v2pro")]
     V2Pro,
@@ -46,12 +47,6 @@ impl ModelVersion {
             ModelVersion::V4 => 16,
             _ => 1,
         }
-    }
-}
-
-impl Default for ModelVersion {
-    fn default() -> Self {
-        ModelVersion::V2
     }
 }
 

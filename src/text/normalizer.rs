@@ -71,7 +71,7 @@ pub fn number_to_chinese(num: i64) -> String {
                     let u = units[i];
                     let d_str = digits[d];
                     // Special case: 10~19 -> "十", "十一", not "一十"
-                    if section < 20 && section >= 10 && i == 1 && d == 1 {
+                    if (10..20).contains(&section) && i == 1 && d == 1 {
                         sec_str = format!("{}{}", u, sec_str);
                     } else {
                         sec_str = format!("{}{}{}", d_str, u, sec_str);

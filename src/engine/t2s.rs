@@ -41,6 +41,7 @@ impl T2SModel {
     }
 
     /// Autoregressively generate semantic tokens
+    #[allow(clippy::too_many_arguments)]
     pub fn generate(
         &self,
         ref_seq: &[i64],

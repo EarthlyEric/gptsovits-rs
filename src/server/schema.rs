@@ -1,17 +1,12 @@
 use crate::audio::AudioFormat;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamFormat {
+    #[default]
     Audio,
     Sse,
-}
-
-impl Default for StreamFormat {
-    fn default() -> Self {
-        StreamFormat::Audio
-    }
 }
 
 /// OpenAI TTS Speech Request Schema (OpenAPI 3.1.0)
