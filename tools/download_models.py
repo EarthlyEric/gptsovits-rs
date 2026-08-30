@@ -150,7 +150,9 @@ def main():
     elif args.version == "base":
         categories = ["base"]
     elif args.version in ("v2proplus", "v2pro"):
-        categories = ["base", "v2pro"]
+        categories = ["base", "v2", "v2pro"]
+    elif args.version in ("v3", "v4"):
+        categories = ["base", "v3", args.version]
     else:
         categories = ["base", args.version]
 
@@ -201,7 +203,16 @@ def main():
     if args.export_onnx:
         import shutil
         exporter_script = os.path.join(script_dir, "onnx_exporter.py")
-        export_ver = "v2" if args.version in ("all", "base") else args.version
+        raw_ver = "v2" if args.version in ("all", "base") else args.version
+        canonical_map = {
+            "v1": "v1",
+            "v2": "v2",
+            "v2pro": "v2Pro",
+            "v2proplus": "v2ProPlus",
+            "v3": "v3",
+            "v4": "v4",
+        }
+        export_ver = canonical_map.get(raw_ver.lower(), raw_ver)
         print(f"\n[*] Triggering ONNX export for version: {export_ver}...")
         uv_cmd = shutil.which("uv")
         cmd = [uv_cmd, "run", exporter_script] if uv_cmd else [sys.executable, exporter_script]

@@ -264,9 +264,48 @@ def export_t2s(gpt_path, vits_path, output_dir, version="v2", cnhubert_path=None
 
 def export_vits(vits_path, output_dir, version="v2"):
     print(f"[*] Exporting VITS Synthesizer ({version}) from {vits_path}...")
-    from onnx_export import VitsModel
+    import torch.nn as nn
+    from onnx_export import DictToAttrRecursive, spectrogram_torch
+    from module.models_onnx import SynthesizerTrn
 
-    vits = VitsModel(vits_path)
+    class VitsModel(nn.Module):
+        def __init__(self, vits_path, version="v2"):
+            super().__init__()
+            dict_s2 = torch.load(vits_path, map_location="cpu")
+            self.hps = dict_s2["config"]
+            if version in ("v2Pro", "v2ProPlus", "v2pro", "v2proplus") or dict_s2.get("config", {}).get("model", {}).get("gin_channels") == 1024:
+                self.hps["model"]["version"] = "v2ProPlus" if "plus" in version.lower() else "v2Pro"
+            elif dict_s2["weight"]["enc_p.text_embedding.weight"].shape[0] == 322:
+                self.hps["model"]["version"] = "v1"
+            else:
+                self.hps["model"]["version"] = "v2"
+
+            self.hps = DictToAttrRecursive(self.hps)
+            self.hps.model.semantic_frame_rate = "25hz"
+            self.vq_model = SynthesizerTrn(
+                self.hps.data.filter_length // 2 + 1,
+                self.hps.train.segment_size // self.hps.data.hop_length,
+                n_speakers=self.hps.data.n_speakers,
+                **self.hps.model,
+            )
+            self.vq_model.eval()
+            self.vq_model.load_state_dict(dict_s2["weight"], strict=False)
+
+        def forward(self, text_seq, pred_semantic, ref_audio):
+            refer = spectrogram_torch(
+                ref_audio,
+                self.hps.data.filter_length,
+                self.hps.data.sampling_rate,
+                self.hps.data.hop_length,
+                self.hps.data.win_length,
+                center=False,
+            )
+            if getattr(self.vq_model, "is_v2pro", False):
+                sv_emb = torch.zeros(1, 20480, dtype=torch.float32)
+                return self.vq_model(pred_semantic, text_seq, refer, sv_emb=sv_emb)[0, 0]
+            return self.vq_model(pred_semantic, text_seq, refer)[0, 0]
+
+    vits = VitsModel(vits_path, version)
     vits_onnx_path = os.path.join(output_dir, "vits.onnx")
 
     text_seq = torch.randint(0, 300, (1, 30), dtype=torch.long)
@@ -295,21 +334,31 @@ def main():
     parser = argparse.ArgumentParser(description="GPT-SoVITS to ONNX Exporter for Rust Inference")
     parser.add_argument("--gpt-path", type=str, help="Path to GPT/T2S checkpoint (.ckpt)")
     parser.add_argument("--sovits-path", type=str, help="Path to SoVITS checkpoint (.pth)")
-    parser.add_argument("--version", type=str, default="v2", choices=["v1", "v2", "v2Pro", "v2ProPlus", "v3", "v4"], help="Model version")
+    parser.add_argument("--version", type=str, default="v2", help="Model version (v1, v2, v2Pro, v2ProPlus, v3, v4)")
     parser.add_argument("--cnhubert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-hubert-base", help="CNHuBERT directory")
     parser.add_argument("--bert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large", help="Chinese RoBERTa directory")
     parser.add_argument("--output-dir", type=str, default="models", help="Output directory for ONNX models")
 
     args = parser.parse_args()
 
-    out_version_dir = os.path.join(args.output_dir, args.version)
+    canonical_map = {
+        "v1": "v1",
+        "v2": "v2",
+        "v2pro": "v2Pro",
+        "v2proplus": "v2ProPlus",
+        "v3": "v3",
+        "v4": "v4",
+    }
+    version_clean = canonical_map.get(args.version.lower(), args.version)
+
+    out_version_dir = os.path.join(args.output_dir, version_clean)
     os.makedirs(out_version_dir, exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "chinese-hubert-base"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "chinese-roberta-wwm-ext-large"), exist_ok=True)
 
     print("==========================================================")
     print("  GPT-SoVITS Pure Rust ONNX Model Exporter (uv compatible)")
-    print(f"  Target Version: {args.version}")
+    print(f"  Target Version: {version_clean}")
     print(f"  Output Directory: {out_version_dir}")
     print("==========================================================")
 
@@ -326,8 +375,8 @@ def main():
 
     # 3. T2S & VITS
     if args.gpt_path and args.sovits_path:
-        export_t2s(args.gpt_path, args.sovits_path, out_version_dir, args.version, args.cnhubert_path)
-        export_vits(args.sovits_path, out_version_dir, args.version)
+        export_t2s(args.gpt_path, args.sovits_path, out_version_dir, version_clean, args.cnhubert_path)
+        export_vits(args.sovits_path, out_version_dir, version_clean)
 
     print("\n[✓] Export completed successfully!")
     print(f"Update your config.toml to point to models under '{args.output_dir}'")
