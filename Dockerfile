@@ -1,18 +1,25 @@
 # ==============================================================================
-# Stage 1: Build binary using official Rust toolchain (Rust 1.85+ with Edition 2024 support)
+# Stage 1: Build binary using Ubuntu 24.04 (Noble) with glibc 2.39+ and GCC 14
 # ==============================================================================
-FROM rust:bookworm AS builder
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /usr/src/gptsovits-rs
 
 # Install system dependencies required for native C/C++ build bindings
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     pkg-config \
     libssl-dev \
     cmake \
     curl \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Install official stable Rust toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy dependency manifests
 COPY Cargo.toml Cargo.lock ./
@@ -26,16 +33,18 @@ COPY assets ./assets
 RUN cargo build --release
 
 # ==============================================================================
-# Stage 2: Minimal runtime image
+# Stage 2: Minimal runtime image based on Ubuntu 24.04
 # ==============================================================================
-FROM debian:bookworm-slim AS runtime
+FROM ubuntu:24.04 AS runtime
 
 LABEL org.opencontainers.image.title="gptsovits-rs"
 LABEL org.opencontainers.image.description="Pure Rust Inference Engine & OpenAI-compatible TTS Server for GPT-SoVITS"
 LABEL org.opencontainers.image.authors="earthlyeric6"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Install runtime utilities: ffmpeg for audio transcoding, ca-certificates, curl for healthcheck, libssl3
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime utilities: ffmpeg for audio transcoding, ca-certificates, curl for healthcheck, libssl3, libgomp1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
