@@ -407,3 +407,60 @@ async fn test_models_and_voices_listing_with_custom_models() {
     assert!(voices_data.iter().any(|v| v["id"] == "sandrone"));
     assert!(!voices_data.iter().any(|v| v["id"] == "alloy"));
 }
+
+#[tokio::test]
+async fn test_openapi_spec_and_docs_endpoints() {
+    let app = setup_test_app();
+
+    // 1. GET /openapi.json
+    let res_spec = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/openapi.json")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res_spec.status(), StatusCode::OK);
+    let body = to_bytes(res_spec.into_body(), usize::MAX).await.unwrap();
+    let json_val: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json_val["openapi"], "3.1.0");
+    assert!(json_val["paths"]["/v1/audio/speech"].is_object());
+
+    // 2. GET /docs (Scalar Interactive Documentation)
+    let res_docs = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/docs")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res_docs.status(), StatusCode::OK);
+    let body_docs = to_bytes(res_docs.into_body(), usize::MAX).await.unwrap();
+    let docs_str = String::from_utf8(body_docs.to_vec()).unwrap();
+    assert!(docs_str.contains("api-reference"));
+    assert!(docs_str.contains("/openapi.json"));
+
+    // 3. GET /swagger-ui (Swagger UI Interactive Documentation)
+    let res_swagger = app
+        .oneshot(
+            Request::builder()
+                .uri("/swagger-ui")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res_swagger.status(), StatusCode::OK);
+    let body_swagger = to_bytes(res_swagger.into_body(), usize::MAX).await.unwrap();
+    let swagger_str = String::from_utf8(body_swagger.to_vec()).unwrap();
+    assert!(swagger_str.contains("swagger-ui"));
+}

@@ -332,7 +332,7 @@ main();
 | :--- | :--- | :---: | :--- | :--- |
 | `model` | string | 是 | 模型識別碼（如 `gpt-sovits-v1` ~ `v4`, `gpt-4o-mini-tts`, `tts-1`） | `"gpt-sovits-v2"` |
 | `input` | string | 是 | 欲合成之文字（長度 1 ~ 4096 字符） | `"你好，世界！"` |
-| `voice` | string \| object | 是 | 音色名稱（字串）或動態音色設定物件 | `"alloy"` |
+| `voice` | string \| object | 是 | 音色名稱（字串）或動態音色設定物件 | `"default"` |
 | `instructions`| string | 否 | 風格、情感或發音指示 | `"自然清晰"` |
 | `response_format` | string | 否 | 音訊格式：`mp3`, `opus`, `aac`, `flac`, `wav`, `pcm` | 預設 `"mp3"` |
 | `speed` | number | 否 | 語速縮放比例（範圍 `0.25` ~ `4.0`） | 預設 `1.0` |
@@ -340,7 +340,17 @@ main();
 
 ---
 
-## 7. 錯誤回應格式與 HTTP 狀態碼
+## 7. 互動式 API 文件與 OpenAPI 規格 (Interactive API Docs)
+
+伺服器內建現代化互動式 API 測試與文件頁面，啟動後可直接於瀏覽器開啟：
+
+* **Scalar 互動文件介面**：`http://localhost:9880/docs`
+* **Swagger UI 介面**：`http://localhost:9880/swagger-ui`
+* **OpenAPI 3.1.0 JSON 規格**：`http://localhost:9880/openapi.json`（亦存於專案根目錄 `openapi.json`，支援直接匯入 Postman 或 OpenAPI Generator）
+
+---
+
+## 8. 錯誤回應格式與 HTTP 狀態碼
 
 所有錯誤皆回傳標準 OpenAI 格式：
 

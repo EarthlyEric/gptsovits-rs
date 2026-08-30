@@ -282,9 +282,12 @@ main();
 | :---: | :--- | :--- |
 | `POST` | `/v1/audio/speech` | 生成語音（符合 OpenAI TTS 規範） |
 | `POST` | `/audio/speech` | 生成語音別名路徑 |
-| `GET` | `/v1/models` | 取得支援之模型列表 |
+| `GET` | `/v1/models` | 取得支援之底模與自訂微調模型列表 |
 | `GET` | `/v1/voices` | 取得可用預設音色列表 |
 | `GET` | `/health` | 服務健康檢查端點 |
+| `GET` | `/docs` | 現代化 Scalar 互動式 API 文件與線上測試介面 |
+| `GET` | `/swagger-ui` | Swagger UI 互動式 API 文件介面 |
+| `GET` | `/openapi.json` | OpenAPI 3.1.0 規格檔案（支援匯入 Postman） |
 
 ---
 

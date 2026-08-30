@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod error;
+pub mod openapi;
 pub mod routes;
 pub mod schema;
 
@@ -14,6 +15,7 @@ use tower_http::trace::TraceLayer;
 use crate::config::AppConfig;
 use crate::engine::ModelManager;
 use crate::server::auth::auth_middleware;
+use crate::server::openapi::{openapi_json, scalar_docs, swagger_ui};
 use crate::server::routes::{create_speech, health_check, list_models, list_voices, AppState};
 use crate::voice::VoiceManager;
 
@@ -51,6 +53,9 @@ pub fn create_router(
 
     Router::new()
         .route("/health", get(health_check))
+        .route("/openapi.json", get(openapi_json))
+        .route("/docs", get(scalar_docs))
+        .route("/swagger-ui", get(swagger_ui))
         .merge(api_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
