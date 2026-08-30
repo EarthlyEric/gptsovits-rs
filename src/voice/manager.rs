@@ -46,15 +46,15 @@ fn default_fragment_interval() -> f32 {
 }
 
 fn default_top_k() -> usize {
-    15
+    20
 }
 
 fn default_top_p() -> f32 {
-    1.0
+    0.6
 }
 
 fn default_temperature() -> f32 {
-    1.0
+    0.6
 }
 
 fn default_repetition_penalty() -> f32 {
@@ -133,29 +133,29 @@ impl Default for VoiceManager {
         let mut voices = HashMap::new();
         let default_preset = VoicePreset {
             ref_audio_path: "voices/default/ref.wav".to_string(),
-            prompt_text: "你好，我是語音合成助理。".to_string(),
+            prompt_text: "先帝创业未半而中道崩殂，今天下三分，益州疲弊。".to_string(),
             prompt_lang: "zh".to_string(),
             text_lang: "zh".to_string(),
             model_version: "v2".to_string(),
             text_split_method: "cut5".to_string(),
             fragment_interval: 0.2,
-            top_k: 15,
-            top_p: 1.0,
-            temperature: 1.0,
+            top_k: 20,
+            top_p: 0.6,
+            temperature: 0.6,
             repetition_penalty: 1.35,
         };
         voices.insert("default".to_string(), default_preset.clone());
         voices.insert("sandrone".to_string(), VoicePreset {
             ref_audio_path: "voices/sandrone/ref.wav".to_string(),
-            prompt_text: "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。".to_string(),
+            prompt_text: "唉，反过来看看我这边。以前有人说我「干最重的活，吃最多的亏」，呵呵，看来说得真不错。".to_string(),
             prompt_lang: "zh".to_string(),
             text_lang: "zh".to_string(),
             model_version: "v2ProPlus".to_string(),
             text_split_method: "cut5".to_string(),
             fragment_interval: 0.2,
-            top_k: 15,
-            top_p: 1.0,
-            temperature: 1.0,
+            top_k: 20,
+            top_p: 0.6,
+            temperature: 0.6,
             repetition_penalty: 1.35,
         });
 

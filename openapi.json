@@ -51,9 +51,9 @@
             "type": "number"
           },
           "temperature": {
-            "default": 1.0,
+            "default": 0.6,
             "description": "Sampling temperature (higher = more expressive/random, lower = more stable)",
-            "example": 1.0,
+            "example": 0.6,
             "format": "float",
             "type": "number"
           },
@@ -69,16 +69,16 @@
             "type": "string"
           },
           "top_k": {
-            "default": 15,
+            "default": 20,
             "description": "Top-K sampling parameter",
-            "example": 15,
+            "example": 20,
             "minimum": 0,
             "type": "integer"
           },
           "top_p": {
-            "default": 1.0,
+            "default": 0.6,
             "description": "Top-P nucleus sampling parameter",
-            "example": 1.0,
+            "example": 0.6,
             "format": "float",
             "type": "number"
           }

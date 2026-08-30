@@ -47,17 +47,17 @@ pub struct DynamicVoiceObject {
 
     /// Top-K sampling parameter
     #[serde(default = "default_top_k")]
-    #[schema(default = 15, example = 15)]
+    #[schema(default = 20, example = 20)]
     pub top_k: usize,
 
     /// Top-P nucleus sampling parameter
     #[serde(default = "default_top_p")]
-    #[schema(default = 1.0, example = 1.0)]
+    #[schema(default = 0.6, example = 0.6)]
     pub top_p: f32,
 
     /// Sampling temperature (higher = more expressive/random, lower = more stable)
     #[serde(default = "default_temperature")]
-    #[schema(default = 1.0, example = 1.0)]
+    #[schema(default = 0.6, example = 0.6)]
     pub temperature: f32,
 
     /// Repetition penalty for autoregressive semantic token generation
@@ -76,13 +76,13 @@ fn default_fragment_interval() -> f32 {
     0.2
 }
 fn default_top_k() -> usize {
-    15
+    20
 }
 fn default_top_p() -> f32 {
-    1.0
+    0.6
 }
 fn default_temperature() -> f32 {
-    1.0
+    0.6
 }
 fn default_repetition_penalty() -> f32 {
     1.35

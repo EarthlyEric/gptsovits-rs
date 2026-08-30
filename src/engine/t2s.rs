@@ -157,8 +157,14 @@ impl T2SModel {
                 v_arr = Array4::from_shape_vec((sv[0] as usize, sv[1] as usize, sv[2] as usize, sv[3] as usize), d_v.to_vec())?;
                 y_emb_arr = Array3::from_shape_vec((semb[0] as usize, semb[1] as usize, semb[2] as usize), d_emb.to_vec())?;
 
+                let current_logits = if d_logits.len() >= 1025 {
+                    &d_logits[d_logits.len() - 1025..]
+                } else {
+                    d_logits
+                };
+
                 let next_token = sample_next_token(
-                    d_logits,
+                    current_logits,
                     &history_tokens,
                     temperature,
                     top_k,

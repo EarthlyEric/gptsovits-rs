@@ -11,23 +11,23 @@ text_lang = "zh"
 model_version = "v2"
 text_split_method = "cut5" # cut0 (不切), cut1 (湊4句), cut2 (湊50字), cut3 (按。切), cut4 (按.切), cut5 (按標點切)
 fragment_interval = 0.2    # 句間自然停頓時間 (秒)
-top_k = 15
-top_p = 1.0
-temperature = 1.0
+top_k = 20
+top_p = 0.6
+temperature = 0.6
 repetition_penalty = 1.35
 
 # ==============================================================================
-# 自訂角色微調音色 (Custom Fine-tuned Voice Preset)
+# 自訂角色微調音色 (Custom Fine-tuned Voice Preset: Sandrone)
 # ==============================================================================
 [voices.sandrone]
 ref_audio_path = "voices/sandrone/ref.wav"
-prompt_text = "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。"
+prompt_text = "唉，反过来看看我这边。以前有人说我「干最重的活，吃最多的亏」，呵呵，看来说得真不错。"
 prompt_lang = "zh"
 text_lang = "zh"
 model_version = "v2ProPlus"
 text_split_method = "cut5"
 fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
+top_k = 20
+top_p = 0.6
+temperature = 0.6
 repetition_penalty = 1.35

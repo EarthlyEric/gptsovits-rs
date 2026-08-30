@@ -321,7 +321,9 @@ impl ModelManager {
             req.ref_audio.clone()
         };
 
-        let ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
+        let mut ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
+        // 0.3s zero padding at the end of prompt audio for boundary protection
+        ref_audio_16k.resize(ref_audio_16k.len() + (16000.0 * 0.3) as usize, 0.0);
         let ref_audio_tgt_sr = resample(&ref_audio, req.ref_sr as usize, target_sr as usize)?;
         let ssl_content = self.cnhubert.extract(&ref_audio_16k)?;
 
@@ -433,7 +435,9 @@ impl ModelManager {
             req.ref_audio.clone()
         };
 
-        let ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
+        let mut ref_audio_16k = resample(&ref_audio, req.ref_sr as usize, 16000)?;
+        // 0.3s zero padding at the end of prompt audio for boundary protection
+        ref_audio_16k.resize(ref_audio_16k.len() + (16000.0 * 0.3) as usize, 0.0);
         let ref_audio_tgt_sr = resample(&ref_audio, req.ref_sr as usize, target_sr as usize)?;
         let ssl_content = self.cnhubert.extract(&ref_audio_16k)?;
 
