@@ -10,7 +10,8 @@ use crate::audio::{encode_audio, load_wav, AudioFormat};
 use crate::engine::{InferenceRequest, ModelManager};
 use crate::server::error::AppError;
 use crate::server::schema::{
-    ModelListResponse, ModelObject, SpeechRequest, StreamFormat, VoiceListResponse, VoiceObject,
+    ErrorResponse, HealthResponse, ModelListResponse, ModelObject, SpeechRequest, StreamFormat,
+    VoiceListResponse, VoiceObject,
 };
 use crate::voice::VoiceManager;
 
@@ -22,6 +23,28 @@ pub struct AppState {
 }
 
 /// Handler for POST /audio/speech and POST /v1/audio/speech
+#[utoipa::path(
+    post,
+    path = "/v1/audio/speech",
+    tag = "Audio",
+    summary = "Create speech from input text",
+    description = "Synthesizes speech audio from the given text using OpenAI-compatible parameters, with GPT-SoVITS zero-shot voice cloning and text segmentation support.",
+    request_body(
+        content = SpeechRequest,
+        description = "TTS parameters including model ID, text input, voice preset or dynamic voice config, speed, and output audio format",
+        content_type = "application/json"
+    ),
+    security(
+        ("bearerAuth" = [])
+    ),
+    responses(
+        (status = 200, description = "Synthesized audio file (binary stream)", content_type = "audio/mpeg"),
+        (status = 400, description = "Bad Request (empty input, speed out of bounds, etc.)", body = ErrorResponse),
+        (status = 401, description = "Unauthorized (invalid or missing API key)", body = ErrorResponse),
+        (status = 404, description = "Not Found (model or voice not found)", body = ErrorResponse),
+        (status = 500, description = "Internal Server Error during inference", body = ErrorResponse)
+    )
+)]
 pub async fn create_speech(
     State(state): State<AppState>,
     Json(payload): Json<SpeechRequest>,
@@ -187,6 +210,19 @@ mod hex {
 }
 
 /// Handler for GET /models and GET /v1/models
+#[utoipa::path(
+    get,
+    path = "/v1/models",
+    tag = "Models",
+    summary = "List available TTS models",
+    description = "Lists official base models (e.g. gpt-sovits-v1..v4) and registered custom fine-tuned models.",
+    security(
+        ("bearerAuth" = [])
+    ),
+    responses(
+        (status = 200, description = "List of models", body = ModelListResponse)
+    )
+)]
 pub async fn list_models(State(state): State<AppState>) -> Json<ModelListResponse> {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -235,6 +271,19 @@ pub async fn list_models(State(state): State<AppState>) -> Json<ModelListRespons
 }
 
 /// Handler for GET /voices and GET /v1/voices
+#[utoipa::path(
+    get,
+    path = "/v1/voices",
+    tag = "Voices",
+    summary = "List available voice presets",
+    description = "Lists all voice presets defined in voices.toml.",
+    security(
+        ("bearerAuth" = [])
+    ),
+    responses(
+        (status = 200, description = "List of voice presets", body = VoiceListResponse)
+    )
+)]
 pub async fn list_voices(State(state): State<AppState>) -> Json<VoiceListResponse> {
     let raw_voices = state.voice_manager.list_voices();
     let data = raw_voices
@@ -255,6 +304,16 @@ pub async fn list_voices(State(state): State<AppState>) -> Json<VoiceListRespons
 }
 
 /// Handler for GET /health
+#[utoipa::path(
+    get,
+    path = "/health",
+    tag = "System",
+    summary = "Service health check",
+    description = "Returns system status and active capacity.",
+    responses(
+        (status = 200, description = "Service is operational", body = HealthResponse)
+    )
+)]
 pub async fn health_check() -> (StatusCode, &'static str) {
     (StatusCode::OK, "{\"status\":\"ok\",\"version\":\"0.1.0\"}")
 }

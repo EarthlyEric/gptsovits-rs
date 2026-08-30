@@ -1,480 +1,521 @@
 {
-  "openapi": "3.1.0",
+  "components": {
+    "schemas": {
+      "AudioFormat": {
+        "enum": [
+          "mp3",
+          "opus",
+          "aac",
+          "flac",
+          "wav",
+          "pcm"
+        ],
+        "type": "string"
+      },
+      "DynamicVoiceObject": {
+        "description": "Dynamic custom voice configuration for zero-shot cloning",
+        "properties": {
+          "fragment_interval": {
+            "default": 0.2,
+            "description": "Silence pause between segmented sentences in seconds",
+            "example": 0.2,
+            "format": "float",
+            "type": "number"
+          },
+          "model_version": {
+            "default": "v2ProPlus",
+            "description": "Model version architecture (v1, v2, v2Pro, v2ProPlus, v3, v4)",
+            "example": "v2ProPlus",
+            "type": "string"
+          },
+          "prompt_lang": {
+            "description": "Language code of prompt_text (zh, en, ja, ko, yue, auto)",
+            "example": "zh",
+            "type": "string"
+          },
+          "prompt_text": {
+            "description": "Transcript / text of the reference audio for prompt conditioning",
+            "example": "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。",
+            "type": "string"
+          },
+          "ref_audio_path": {
+            "description": "Path to the 3~10s reference audio WAV file",
+            "example": "voices/sandrone/ref.wav",
+            "type": "string"
+          },
+          "repetition_penalty": {
+            "default": 1.35,
+            "description": "Repetition penalty for autoregressive semantic token generation",
+            "example": 1.35,
+            "format": "float",
+            "type": "number"
+          },
+          "temperature": {
+            "default": 1.0,
+            "description": "Sampling temperature (higher = more expressive/random, lower = more stable)",
+            "example": 1.0,
+            "format": "float",
+            "type": "number"
+          },
+          "text_lang": {
+            "description": "Language code of target input text (zh, en, ja, ko, yue, auto)",
+            "example": "zh",
+            "type": "string"
+          },
+          "text_split_method": {
+            "default": "cut5",
+            "description": "Text segmentation strategy",
+            "example": "cut5",
+            "type": "string"
+          },
+          "top_k": {
+            "default": 15,
+            "description": "Top-K sampling parameter",
+            "example": 15,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "top_p": {
+            "default": 1.0,
+            "description": "Top-P nucleus sampling parameter",
+            "example": 1.0,
+            "format": "float",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ref_audio_path",
+          "prompt_text",
+          "prompt_lang",
+          "text_lang"
+        ],
+        "type": "object"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "example": "empty_input",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "message": {
+            "example": "Input text cannot be empty.",
+            "type": "string"
+          },
+          "param": {
+            "example": "input",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "example": "invalid_request_error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "type"
+        ],
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "description": "OpenAI Standard Error Response Schema",
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "available_permits": {
+            "example": 8,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "engine": {
+            "example": "gptsovits-rs",
+            "type": "string"
+          },
+          "status": {
+            "example": "ok",
+            "type": "string"
+          },
+          "version": {
+            "example": "0.1.0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "engine",
+          "version",
+          "available_permits"
+        ],
+        "type": "object"
+      },
+      "ModelListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ModelObject"
+            },
+            "type": "array"
+          },
+          "object": {
+            "example": "list",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object",
+          "data"
+        ],
+        "type": "object"
+      },
+      "ModelObject": {
+        "properties": {
+          "created": {
+            "example": 1700000000,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "example": "gpt-sovits-v2",
+            "type": "string"
+          },
+          "object": {
+            "example": "model",
+            "type": "string"
+          },
+          "owned_by": {
+            "example": "official-base",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "created",
+          "owned_by"
+        ],
+        "type": "object"
+      },
+      "SpeechRequest": {
+        "description": "OpenAI TTS Speech Request Schema (OpenAPI 3.1.0 compatible)",
+        "properties": {
+          "input": {
+            "description": "Text to synthesize (1..4096 characters)",
+            "example": "先帝創業未半而中道崩殂，今天下三分，益州疲弊。",
+            "type": "string"
+          },
+          "instructions": {
+            "description": "Optional instructions controlling speaking style, tone, or emotion",
+            "example": "Speak in a calm and dignified tone.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "description": "TTS model identifier (e.g. gpt-sovits-v2, gpt-sovits-v4, or custom model name like sandrone)",
+            "example": "gpt-sovits-v2",
+            "type": "string"
+          },
+          "response_format": {
+            "default": "mp3",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AudioFormat",
+                "description": "Audio output format (mp3, opus, aac, flac, wav, pcm)"
+              }
+            ]
+          },
+          "speed": {
+            "default": 1.0,
+            "description": "Speed of the synthesized speech (0.25 to 4.0, default 1.0)",
+            "example": 1.0,
+            "format": "float",
+            "maximum": 4,
+            "minimum": 0.25,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "stream_format": {
+            "default": "audio",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/StreamFormat",
+                "description": "Streaming format (audio or sse, default audio)"
+              }
+            ]
+          },
+          "voice": {
+            "description": "Voice identifier (e.g. \"default\", \"sandrone\") or dynamic custom voice configuration object",
+            "type": "object"
+          }
+        },
+        "required": [
+          "model",
+          "input",
+          "voice"
+        ],
+        "type": "object"
+      },
+      "StreamFormat": {
+        "description": "Streaming delivery format",
+        "enum": [
+          "audio",
+          "sse"
+        ],
+        "type": "string"
+      },
+      "VoiceListResponse": {
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/VoiceObject"
+            },
+            "type": "array"
+          },
+          "object": {
+            "example": "list",
+            "type": "string"
+          }
+        },
+        "required": [
+          "object",
+          "data"
+        ],
+        "type": "object"
+      },
+      "VoiceObject": {
+        "properties": {
+          "id": {
+            "example": "default",
+            "type": "string"
+          },
+          "model_version": {
+            "example": "v2",
+            "type": "string"
+          },
+          "name": {
+            "example": "Default Voice Preset",
+            "type": "string"
+          },
+          "prompt_lang": {
+            "example": "zh",
+            "type": "string"
+          },
+          "text_lang": {
+            "example": "zh",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "model_version",
+          "prompt_lang",
+          "text_lang"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "API Key",
+        "description": "Bearer authentication token configured in config.toml",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
   "info": {
-    "title": "GPT-SoVITS Pure Rust Inference Engine & OpenAI TTS API",
-    "version": "0.1.0",
+    "contact": {
+      "name": "earthlyeric6"
+    },
     "description": "High-performance pure Rust inference engine and 100% OpenAI-compatible TTS server for GPT-SoVITS (supporting v1, v2, v2Pro, v2ProPlus, v3, and v4 models).",
     "license": {
       "name": "MIT or Apache-2.0"
-    }
+    },
+    "title": "GPT-SoVITS Pure Rust Inference Engine & OpenAI TTS API",
+    "version": "0.1.0"
   },
-  "servers": [
-    {
-      "url": "/",
-      "description": "Current Server Instance"
-    }
-  ],
+  "openapi": "3.1.0",
   "paths": {
+    "/health": {
+      "get": {
+        "description": "Returns system status and active capacity.",
+        "operationId": "health_check",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Service is operational"
+          }
+        },
+        "summary": "Service health check",
+        "tags": [
+          "System"
+        ]
+      }
+    },
     "/v1/audio/speech": {
       "post": {
-        "summary": "Create speech from input text",
-        "description": "Generates audio from the input text using OpenAI-compatible parameters, with GPT-SoVITS zero-shot voice cloning and text segmentation support.",
-        "operationId": "createSpeech",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "description": "Synthesizes speech audio from the given text using OpenAI-compatible parameters, with GPT-SoVITS zero-shot voice cloning and text segmentation support.",
+        "operationId": "create_speech",
         "requestBody": {
-          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateSpeechRequest"
+                "$ref": "#/components/schemas/SpeechRequest"
               }
             }
-          }
+          },
+          "description": "TTS parameters including model ID, text input, voice preset or dynamic voice config, speed, and output audio format",
+          "required": true
         },
         "responses": {
           "200": {
-            "description": "The synthesized audio file in the requested format or streamed chunks.",
             "content": {
-              "audio/mpeg": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "audio/wav": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "audio/opus": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "audio/aac": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "audio/flac": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              },
-              "application/octet-stream": {
-                "schema": {
-                  "type": "string",
-                  "format": "binary"
-                }
-              }
-            }
+              "audio/mpeg": {}
+            },
+            "description": "Synthesized audio file (binary stream)"
           },
           "400": {
-            "description": "Bad Request (e.g. empty input, input exceeds 4096 characters, invalid speed).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Bad Request (empty input, speed out of bounds, etc.)"
           },
           "401": {
-            "description": "Unauthorized (missing or invalid API bearer token).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Unauthorized (invalid or missing API key)"
           },
           "404": {
-            "description": "Not Found (requested model or voice not configured).",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Not Found (model or voice not found)"
           },
           "500": {
-            "description": "Internal Server Error during inference or audio encoding.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
-            }
+            },
+            "description": "Internal Server Error during inference"
           }
-        }
-      }
-    },
-    "/audio/speech": {
-      "post": {
-        "summary": "Create speech (alternative path without /v1 prefix)",
-        "description": "Direct alias for /v1/audio/speech.",
-        "operationId": "createSpeechAlt",
+        },
         "security": [
           {
             "bearerAuth": []
           }
         ],
-        "requestBody": {
-          "$ref": "#/paths/~1v1~1audio~1speech/post/requestBody"
-        },
-        "responses": {
-          "$ref": "#/paths/~1v1~1audio~1speech/post/responses"
-        }
+        "summary": "Create speech from input text",
+        "tags": [
+          "Audio"
+        ]
       }
     },
     "/v1/models": {
       "get": {
-        "summary": "List available TTS models",
-        "description": "Lists official base models (e.g. gpt-sovits-v1..v4) and custom fine-tuned models registered in config.toml.",
-        "operationId": "listModels",
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ],
+        "description": "Lists official base models (e.g. gpt-sovits-v1..v4) and registered custom fine-tuned models.",
+        "operationId": "list_models",
         "responses": {
           "200": {
-            "description": "List of available models",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ModelListResponse"
                 }
               }
-            }
+            },
+            "description": "List of models"
           }
-        }
-      }
-    },
-    "/v1/voices": {
-      "get": {
-        "summary": "List available voice presets",
-        "description": "Lists all voice presets defined in voices.toml with their configured languages and parameters.",
-        "operationId": "listVoices",
+        },
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "summary": "List available TTS models",
+        "tags": [
+          "Models"
+        ]
+      }
+    },
+    "/v1/voices": {
+      "get": {
+        "description": "Lists all voice presets defined in voices.toml.",
+        "operationId": "list_voices",
         "responses": {
           "200": {
-            "description": "List of available voice presets",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VoiceListResponse"
                 }
               }
-            }
+            },
+            "description": "List of voice presets"
           }
-        }
-      }
-    },
-    "/health": {
-      "get": {
-        "summary": "Health and status check",
-        "description": "Returns the server health status and active worker capacity.",
-        "operationId": "healthCheck",
-        "responses": {
-          "200": {
-            "description": "Server is running normally",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "ok"
-                    },
-                    "engine": {
-                      "type": "string",
-                      "example": "gptsovits-rs"
-                    },
-                    "version": {
-                      "type": "string",
-                      "example": "0.1.0"
-                    },
-                    "available_permits": {
-                      "type": "integer",
-                      "example": 8
-                    }
-                  }
-                }
-              }
-            }
+        },
+        "security": [
+          {
+            "bearerAuth": []
           }
-        }
+        ],
+        "summary": "List available voice presets",
+        "tags": [
+          "Voices"
+        ]
       }
     }
   },
-  "components": {
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "API Key",
-        "description": "Enter your API key configured in config.toml (or leave empty if api_key is disabled)"
-      }
-    },
-    "schemas": {
-      "CreateSpeechRequest": {
-        "type": "object",
-        "required": [
-          "model",
-          "input",
-          "voice"
-        ],
-        "properties": {
-          "model": {
-            "type": "string",
-            "description": "Model ID to synthesize speech (e.g. gpt-sovits-v2, gpt-sovits-v4, or custom model name like sandrone)",
-            "example": "gpt-sovits-v2"
-          },
-          "input": {
-            "type": "string",
-            "description": "The text to generate audio for. Maximum length is 4096 characters.",
-            "example": "先帝創業未半而中道崩殂，今天下三分，益州疲弊。"
-          },
-          "voice": {
-            "description": "The voice to use for generation. Can be a string identifier (e.g. 'default', 'sandrone') or a dynamic custom voice object for zero-shot cloning.",
-            "oneOf": [
-              {
-                "type": "string",
-                "example": "default"
-              },
-              {
-                "$ref": "#/components/schemas/DynamicVoiceObject"
-              }
-            ]
-          },
-          "instructions": {
-            "type": "string",
-            "description": "Optional instructions controlling speaking style, tone, or emotion.",
-            "example": "Speak in a gentle and polite tone."
-          },
-          "response_format": {
-            "type": "string",
-            "enum": [
-              "mp3",
-              "opus",
-              "aac",
-              "flac",
-              "wav",
-              "pcm"
-            ],
-            "default": "mp3",
-            "description": "The audio format to return."
-          },
-          "speed": {
-            "type": "number",
-            "minimum": 0.25,
-            "maximum": 4.0,
-            "default": 1.0,
-            "description": "The speed of the generated audio. Select values from 0.25 to 4.0. 1.0 is default."
-          },
-          "stream_format": {
-            "type": "string",
-            "enum": [
-              "audio",
-              "sse"
-            ],
-            "default": "audio",
-            "description": "Streaming delivery format (audio stream or Server-Sent Events)."
-          }
-        }
-      },
-      "DynamicVoiceObject": {
-        "type": "object",
-        "properties": {
-          "ref_audio_path": {
-            "type": "string",
-            "description": "Local path to 3~10s reference audio wav file for voice cloning",
-            "example": "voices/sandrone/ref.wav"
-          },
-          "prompt_text": {
-            "type": "string",
-            "description": "Transcript of the reference audio for cross-lingual / zero-shot synthesis",
-            "example": "我是「木偶」桑多涅。"
-          },
-          "prompt_lang": {
-            "type": "string",
-            "description": "Language of prompt_text (zh, en, ja, ko, yue, auto)",
-            "example": "zh"
-          },
-          "text_lang": {
-            "type": "string",
-            "description": "Language of input text (zh, en, ja, ko, yue, auto)",
-            "example": "zh"
-          },
-          "model_version": {
-            "type": "string",
-            "description": "Model architecture version (v1, v2, v2Pro, v2ProPlus, v3, v4)",
-            "example": "v2ProPlus"
-          },
-          "text_split_method": {
-            "type": "string",
-            "enum": [
-              "cut0",
-              "cut1",
-              "cut2",
-              "cut3",
-              "cut4",
-              "cut5"
-            ],
-            "default": "cut5",
-            "description": "Text segmentation strategy: cut0(no cut), cut1(every 4 sentences), cut2(every ~50 chars), cut3(Chinese period), cut4(English period), cut5(all punctuations, lowest latency)"
-          },
-          "fragment_interval": {
-            "type": "number",
-            "default": 0.2,
-            "description": "Silence pause between segmented sentences (seconds)"
-          },
-          "top_k": {
-            "type": "integer",
-            "default": 15,
-            "description": "Top-K sampling parameter"
-          },
-          "top_p": {
-            "type": "number",
-            "default": 1.0,
-            "description": "Top-P sampling parameter"
-          },
-          "temperature": {
-            "type": "number",
-            "default": 1.0,
-            "description": "Sampling temperature"
-          },
-          "repetition_penalty": {
-            "type": "number",
-            "default": 1.35,
-            "description": "Repetition penalty for autoregressive semantic token generation"
-          }
-        }
-      },
-      "ModelObject": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "gpt-sovits-v2"
-          },
-          "object": {
-            "type": "string",
-            "example": "model"
-          },
-          "created": {
-            "type": "integer",
-            "example": 1700000000
-          },
-          "owned_by": {
-            "type": "string",
-            "example": "official-base"
-          }
-        }
-      },
-      "ModelListResponse": {
-        "type": "object",
-        "properties": {
-          "object": {
-            "type": "string",
-            "example": "list"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ModelObject"
-            }
-          }
-        }
-      },
-      "VoiceObject": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "default"
-          },
-          "name": {
-            "type": "string",
-            "example": "Default Chinese Preset"
-          },
-          "model_version": {
-            "type": "string",
-            "example": "v2"
-          },
-          "prompt_lang": {
-            "type": "string",
-            "example": "zh"
-          },
-          "text_lang": {
-            "type": "string",
-            "example": "zh"
-          }
-        }
-      },
-      "VoiceListResponse": {
-        "type": "object",
-        "properties": {
-          "object": {
-            "type": "string",
-            "example": "list"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VoiceObject"
-            }
-          }
-        }
-      },
-      "ErrorDetail": {
-        "type": "object",
-        "properties": {
-          "message": {
-            "type": "string",
-            "example": "Input text cannot be empty."
-          },
-          "type": {
-            "type": "string",
-            "example": "invalid_request_error"
-          },
-          "param": {
-            "type": "string",
-            "nullable": true,
-            "example": "input"
-          },
-          "code": {
-            "type": "string",
-            "nullable": true,
-            "example": "empty_input"
-          }
-        }
-      },
-      "ErrorResponse": {
-        "type": "object",
-        "properties": {
-          "error": {
-            "$ref": "#/components/schemas/ErrorDetail"
-          }
-        }
-      }
+  "servers": [
+    {
+      "description": "Current Server Instance",
+      "url": "/"
     }
-  }
+  ]
 }

@@ -11,11 +11,14 @@ use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable as ScalarServable};
+use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::AppConfig;
 use crate::engine::ModelManager;
 use crate::server::auth::auth_middleware;
-use crate::server::openapi::{openapi_json, scalar_docs, swagger_ui};
+use crate::server::openapi::ApiDoc;
 use crate::server::routes::{create_speech, health_check, list_models, list_voices, AppState};
 use crate::voice::VoiceManager;
 
@@ -53,9 +56,8 @@ pub fn create_router(
 
     Router::new()
         .route("/health", get(health_check))
-        .route("/openapi.json", get(openapi_json))
-        .route("/docs", get(scalar_docs))
-        .route("/swagger-ui", get(swagger_ui))
+        .merge(SwaggerUi::new("/swagger-ui").url("/openapi.json", ApiDoc::openapi()))
+        .merge(Scalar::with_url("/docs", ApiDoc::openapi()))
         .merge(api_routes)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
