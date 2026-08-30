@@ -95,6 +95,9 @@ ensure_gpt_sovits_repo()
 
 try:
     import torch
+    import functools
+    _orig_torch_load = torch.load
+    torch.load = functools.partial(_orig_torch_load, weights_only=False)
     import torchaudio
     from transformers import AutoTokenizer, AutoModelForMaskedLM
 except ImportError:
@@ -335,6 +338,7 @@ def main():
     parser.add_argument("--gpt-path", type=str, help="Path to GPT/T2S checkpoint (.ckpt)")
     parser.add_argument("--sovits-path", type=str, help="Path to SoVITS checkpoint (.pth)")
     parser.add_argument("--version", type=str, default="v2", help="Model version (v1, v2, v2Pro, v2ProPlus, v3, v4)")
+    parser.add_argument("--custom-name", type=str, help="Custom model identifier (e.g. sandrone) to output directly into models/<custom-name>/")
     parser.add_argument("--cnhubert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-hubert-base", help="CNHuBERT directory")
     parser.add_argument("--bert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large", help="Chinese RoBERTa directory")
     parser.add_argument("--output-dir", type=str, default="models", help="Output directory for ONNX models")
@@ -351,7 +355,8 @@ def main():
     }
     version_clean = canonical_map.get(args.version.lower(), args.version)
 
-    out_version_dir = os.path.join(args.output_dir, version_clean)
+    target_subdir = args.custom_name if args.custom_name else version_clean
+    out_version_dir = os.path.join(args.output_dir, target_subdir)
     os.makedirs(out_version_dir, exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "chinese-hubert-base"), exist_ok=True)
     os.makedirs(os.path.join(args.output_dir, "chinese-roberta-wwm-ext-large"), exist_ok=True)
@@ -359,6 +364,8 @@ def main():
     print("==========================================================")
     print("  GPT-SoVITS Pure Rust ONNX Model Exporter (uv compatible)")
     print(f"  Target Version: {version_clean}")
+    if args.custom_name:
+        print(f"  Custom Name:    {args.custom_name}")
     print(f"  Output Directory: {out_version_dir}")
     print("==========================================================")
 

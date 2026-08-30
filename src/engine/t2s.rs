@@ -115,7 +115,9 @@ impl T2SModel {
             let mut k_arr = Array4::from_shape_vec((sk[0] as usize, sk[1] as usize, sk[2] as usize, sk[3] as usize), d_k.to_vec())?;
             let mut v_arr = Array4::from_shape_vec((sv[0] as usize, sv[1] as usize, sv[2] as usize, sv[3] as usize), d_v.to_vec())?;
             let mut y_emb_arr = Array3::from_shape_vec((semb[0] as usize, semb[1] as usize, semb[2] as usize), d_emb.to_vec())?;
-            let x_example_arr = Array3::from_shape_vec((sex[0] as usize, sex[1] as usize, sex[2] as usize), d_ex.to_vec())?;
+            
+            let sex_dims: Vec<usize> = sex.iter().map(|&dim| dim as usize).collect();
+            let x_example_arr = ndarray::ArrayD::from_shape_vec(ndarray::IxDyn(&sex_dims), d_ex.to_vec())?;
 
             let mut generated_tokens = Vec::new();
             let mut history_tokens = y_arr.as_slice().unwrap().to_vec();
