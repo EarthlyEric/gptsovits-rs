@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   gptsovits-rs:
     image: ghcr.io/earthlyeric/gptsovits-rs:latest

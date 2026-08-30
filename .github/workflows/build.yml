@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - master
     tags:
       - "v*"
     paths-ignore:
@@ -15,11 +14,11 @@ on:
       - "voices/**"
       - "models/**"
       - ".gitignore"
+      - "docker-compose.yml"
       - "openapi.json"
   pull_request:
     branches:
       - main
-      - master
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -28,6 +27,7 @@ on:
       - "voices/**"
       - "models/**"
       - ".gitignore"
+      - "docker-compose.yml"
       - "openapi.json"
   workflow_dispatch:
 
