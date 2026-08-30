@@ -1,5 +1,8 @@
-# OpenAI Standard Voice Mappings and Custom Presets
+# Voice Presets Configuration
 
+# ==============================================================================
+# 預設通用音色 (Default Voice Preset)
+# ==============================================================================
 [voices.default]
 ref_audio_path = "voices/default/ref.wav"
 prompt_text = "先帝创业未半而中道崩殂，今天下三分，益州疲弊。"
@@ -13,84 +16,9 @@ top_p = 1.0
 temperature = 1.0
 repetition_penalty = 1.35
 
-[voices.alloy]
-ref_audio_path = "voices/alloy/ref.wav"
-prompt_text = "Hello, this is a clear and natural voice demonstration."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut5"
-fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
-[voices.echo]
-ref_audio_path = "voices/echo/ref.wav"
-prompt_text = "Echo provides a deep and resonant sound profile."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut5"
-fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
-[voices.fable]
-ref_audio_path = "voices/fable/ref.wav"
-prompt_text = "Fable brings an expressive and narrative storytelling tone."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut2" # 適合長文故事朗讀
-fragment_interval = 0.3
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
-[voices.onyx]
-ref_audio_path = "voices/onyx/ref.wav"
-prompt_text = "Onyx delivers an authoritative and warm voice."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut5"
-fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
-[voices.nova]
-ref_audio_path = "voices/nova/ref.wav"
-prompt_text = "Nova is energetic, bright and highly engaging."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut5"
-fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
-[voices.shimmer]
-ref_audio_path = "voices/shimmer/ref.wav"
-prompt_text = "Shimmer offers a soft, pleasant and clear voice."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut5"
-fragment_interval = 0.2
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
+# ==============================================================================
+# 自訂角色微調音色 (Custom Fine-tuned Voice Preset)
+# ==============================================================================
 [voices.sandrone]
 ref_audio_path = "voices/sandrone/ref.wav"
 prompt_text = "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。"

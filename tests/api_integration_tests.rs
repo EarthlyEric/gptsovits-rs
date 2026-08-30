@@ -58,7 +58,7 @@ async fn test_auth_failure_returns_401_openai_format() {
     let req_body = json!({
         "model": "gpt-sovits-v2",
         "input": "測試認證失敗",
-        "voice": "alloy"
+        "voice": "default"
     });
 
     let response = app
@@ -98,7 +98,7 @@ async fn test_create_speech_success_all_base_versions() {
         let req_body = json!({
             "model": model_name,
             "input": "今天天氣真好，歡迎使用純 Rust GPT-SoVITS 推論伺服器！",
-            "voice": "alloy",
+            "voice": "default",
             "response_format": "wav",
             "speed": 1.2
         });
@@ -172,7 +172,7 @@ async fn test_unknown_model_returns_404() {
     let req_body = json!({
         "model": "nonexistent-character-model",
         "input": "測試不存在的模型",
-        "voice": "alloy"
+        "voice": "default"
     });
 
     let response = app
@@ -240,11 +240,11 @@ async fn test_create_speech_with_dynamic_voice_object() {
 async fn test_create_speech_with_segmented_text_methods() {
     let app = setup_test_app();
 
-    // 1. Voice preset with default cut2 (fable)
-    let req_body_fable = json!({
-        "model": "gpt-sovits-v2",
+    // 1. Voice preset with default cut5 (sandrone)
+    let req_body_sandrone = json!({
+        "model": "gpt-sovits-v2proplus",
         "input": "First clause. Second clause, third clause! Fourth clause? Fifth clause.",
-        "voice": "fable",
+        "voice": "sandrone",
         "response_format": "wav"
     });
 
@@ -256,7 +256,7 @@ async fn test_create_speech_with_segmented_text_methods() {
                 .uri("/v1/audio/speech")
                 .header(header::CONTENT_TYPE, "application/json")
                 .header(header::AUTHORIZATION, "Bearer test-secret-token")
-                .body(Body::from(req_body_fable.to_string()))
+                .body(Body::from(req_body_sandrone.to_string()))
                 .unwrap(),
         )
         .await
@@ -303,7 +303,7 @@ async fn test_empty_input_returns_400() {
     let req_body = json!({
         "model": "gpt-sovits-v2",
         "input": "",
-        "voice": "alloy"
+        "voice": "default"
     });
 
     let response = app
@@ -332,7 +332,7 @@ async fn test_invalid_speed_returns_400() {
     let req_body = json!({
         "model": "gpt-sovits-v2",
         "input": "測試無效語速",
-        "voice": "alloy",
+        "voice": "default",
         "speed": 5.0
     });
 
@@ -399,4 +399,11 @@ async fn test_models_and_voices_listing_with_custom_models() {
         .unwrap();
 
     assert_eq!(res_voices.status(), StatusCode::OK);
+    let body_voices = to_bytes(res_voices.into_body(), usize::MAX).await.unwrap();
+    let json_voices: serde_json::Value = serde_json::from_slice(&body_voices).unwrap();
+    let voices_data = json_voices["data"].as_array().unwrap();
+
+    assert!(voices_data.iter().any(|v| v["id"] == "default"));
+    assert!(voices_data.iter().any(|v| v["id"] == "sandrone"));
+    assert!(!voices_data.iter().any(|v| v["id"] == "alloy"));
 }

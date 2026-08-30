@@ -153,14 +153,17 @@ sampling_rate = 32000
 
 ### 4.2 音色預設 (`voices.toml`)
 
-定義 OpenAI 標準音色（`alloy`, `echo`, `shimmer` 等）與自訂角色音色對應之參考音訊、提示詞與文字切分策略：
+定義預設音色（`default`）與自訂角色微調音色（`sandrone` 等）對應之參考音訊、提示詞與文字切分策略：
 
 ```toml
-[voices.alloy]
-ref_audio_path = "voices/alloy/ref.wav"
-prompt_text = "Hello, this is a clear and natural voice demonstration."
-prompt_lang = "en"
-text_lang = "en"
+# ==========================================
+# 預設通用音色 (Default)
+# ==========================================
+[voices.default]
+ref_audio_path = "voices/default/ref.wav"
+prompt_text = "先帝创业未半而中道崩殂，今天下三分，益州疲弊。"
+prompt_lang = "zh"
+text_lang = "zh"
 model_version = "v2"
 text_split_method = "cut5"      # 👈 cut0(不切), cut1(湊4句), cut2(湊50字), cut3(按。切), cut4(按.切), cut5(按標點切)
 fragment_interval = 0.2         # 句間自然停頓時間 (秒)
@@ -169,19 +172,9 @@ top_p = 1.0
 temperature = 1.0
 repetition_penalty = 1.35
 
-[voices.fable]
-ref_audio_path = "voices/fable/ref.wav"
-prompt_text = "Fable brings an expressive and narrative storytelling tone."
-prompt_lang = "en"
-text_lang = "en"
-model_version = "v2"
-text_split_method = "cut2"      # 👈 適合長文故事朗讀 (湊 50 字切分)
-fragment_interval = 0.3
-top_k = 15
-top_p = 1.0
-temperature = 1.0
-repetition_penalty = 1.35
-
+# ==========================================
+# 自訂角色微調音色 (Sandrone)
+# ==========================================
 [voices.sandrone]
 ref_audio_path = "voices/sandrone/ref.wav"
 prompt_text = "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。"
@@ -232,7 +225,7 @@ curl http://localhost:9880/v1/audio/speech \
   -d '{
     "model": "gpt-sovits-v2",
     "input": "先帝創業未半而中道崩殂，今天下三分，益州疲弊。",
-    "voice": "alloy",
+    "voice": "default",
     "response_format": "mp3",
     "speed": 1.0
   }' \
@@ -289,7 +282,7 @@ client = OpenAI(
 
 response = client.audio.speech.create(
     model="gpt-sovits-v2",
-    voice="alloy",
+    voice="default",
     input="歡迎使用純 Rust 高效能 GPT-SoVITS 推論引擎！",
     response_format="mp3",
     speed=1.0
@@ -316,7 +309,7 @@ const openai = new OpenAI({
 async function main() {
   const mp3 = await openai.audio.speech.create({
     model: "gpt-sovits-v2",
-    voice: "alloy",
+    voice: "default",
     input: "你好！這是一段透過 Node.js 官方 SDK 生成的語音。",
     response_format: "mp3",
   });

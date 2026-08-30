@@ -193,7 +193,7 @@ curl http://localhost:9880/v1/audio/speech \
   -d '{
     "model": "gpt-sovits-v2",
     "input": "先帝創業未半而中道崩殂，今天下三分，益州疲弊。",
-    "voice": "alloy",
+    "voice": "default",
     "response_format": "mp3",
     "speed": 1.0
   }' \
@@ -235,7 +235,7 @@ client = OpenAI(
 
 response = client.audio.speech.create(
     model="gpt-sovits-v2",
-    voice="alloy",
+    voice="default",
     input="歡迎使用純 Rust 高效能 GPT-SoVITS 推論引擎！",
     response_format="mp3",
     speed=1.0
@@ -261,7 +261,7 @@ const openai = new OpenAI({
 async function main() {
   const mp3 = await openai.audio.speech.create({
     model: "gpt-sovits-v2",
-    voice="alloy",
+    voice: "default",
     input: "你好！這是一段透過 Node.js 官方 SDK 生成的語音。",
     response_format: "mp3",
   });

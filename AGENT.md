@@ -42,7 +42,7 @@
 
 ### 2.3 語音與音色解析規則
 - `voice` 欄位支援兩種格式：
-  1. **字串格式**（如 `"alloy"`, `"echo"`, `"sandrone"`）：從 `voices.toml` 中查找預先設定好的 `ref_audio_path`、`prompt_text`、`prompt_lang` 與 `model_version`。
+  1. **字串格式**（如 `"default"`, `"sandrone"`）：從 `voices.toml` 中查找預先設定好的 `ref_audio_path`、`prompt_text`、`prompt_lang` 與 `model_version`。
   2. **自訂物件格式**（如 `{"ref_audio_path": "...", "prompt_text": "...", "prompt_lang": "zh", "text_lang": "zh"}`）：動態傳入參考音訊與提示詞進行零樣本複製（Zero-Shot Cloning）。
 
 ---

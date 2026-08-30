@@ -145,19 +145,18 @@ impl Default for VoiceManager {
             repetition_penalty: 1.35,
         };
         voices.insert("default".to_string(), default_preset.clone());
-        voices.insert("alloy".to_string(), default_preset.clone());
-        voices.insert("echo".to_string(), default_preset.clone());
-        voices.insert("fable".to_string(), VoicePreset {
-            text_split_method: "cut2".to_string(),
-            ..default_preset.clone()
-        });
-        voices.insert("onyx".to_string(), default_preset.clone());
-        voices.insert("nova".to_string(), default_preset.clone());
-        voices.insert("shimmer".to_string(), default_preset.clone());
         voices.insert("sandrone".to_string(), VoicePreset {
+            ref_audio_path: "voices/sandrone/ref.wav".to_string(),
+            prompt_text: "我是「木偶」桑多涅。不必多言，做好你分内的事情即可。".to_string(),
+            prompt_lang: "zh".to_string(),
+            text_lang: "zh".to_string(),
             model_version: "v2ProPlus".to_string(),
             text_split_method: "cut5".to_string(),
-            ..default_preset
+            fragment_interval: 0.2,
+            top_k: 15,
+            top_p: 1.0,
+            temperature: 1.0,
+            repetition_penalty: 1.35,
         });
 
         Self { voices }
