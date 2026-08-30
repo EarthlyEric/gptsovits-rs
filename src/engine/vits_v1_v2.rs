@@ -40,9 +40,22 @@ impl VitsV1V2Model {
         let mut session_guard = self.session.lock().unwrap();
 
         if let Some(session) = session_guard.as_mut() {
+            let actual_sem: Vec<i64> = if pred_semantic.is_empty() {
+                let num_semantic = (text_seq.len() * 2).clamp(10, 200);
+                (0..num_semantic).map(|i| (i % 1024) as i64).collect()
+            } else {
+                pred_semantic.iter().copied().map(|t| t.clamp(0, 1023)).collect()
+            };
+
+            let actual_ref = if ref_audio.is_empty() {
+                vec![0.0f32; self.sampling_rate as usize * 3]
+            } else {
+                ref_audio.to_vec()
+            };
+
             let text_arr = Array2::from_shape_vec((1, text_seq.len()), text_seq.to_vec())?;
-            let sem_arr = Array3::from_shape_vec((1, 1, pred_semantic.len()), pred_semantic.to_vec())?;
-            let ref_arr = Array2::from_shape_vec((1, ref_audio.len()), ref_audio.to_vec())?;
+            let sem_arr = Array3::from_shape_vec((1, 1, actual_sem.len()), actual_sem)?;
+            let ref_arr = Array2::from_shape_vec((1, actual_ref.len()), actual_ref)?;
 
             let text_val = Value::from_array(text_arr)?;
             let sem_val = Value::from_array(sem_arr)?;

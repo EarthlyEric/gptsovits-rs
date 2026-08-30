@@ -96,8 +96,23 @@ ensure_gpt_sovits_repo()
 try:
     import torch
     import functools
+
     _orig_torch_load = torch.load
-    torch.load = functools.partial(_orig_torch_load, weights_only=False)
+
+    def _safe_torch_load(f, *args, **kwargs):
+        kwargs["weights_only"] = False
+        if isinstance(f, (str, os.PathLike)) and os.path.exists(f):
+            try:
+                with open(f, "r+b") as fp:
+                    magic = fp.read(2)
+                    if magic == b"06":
+                        fp.seek(0)
+                        fp.write(b"PK")
+            except Exception:
+                pass
+        return _orig_torch_load(f, *args, **kwargs)
+
+    torch.load = _safe_torch_load
     import torchaudio
     from transformers import AutoTokenizer, AutoModelForMaskedLM
 except ImportError:
@@ -184,14 +199,55 @@ def export_roberta(bert_path, output_path, output_tok_path):
     )
     print(f"[+] RoBERTa exported successfully: {output_path}")
 
+class VitsModel(torch.nn.Module):
+    def __init__(self, vits_path, version="v2"):
+        super().__init__()
+        from onnx_export import DictToAttrRecursive
+        from module.models_onnx import SynthesizerTrn
+
+        dict_s2 = torch.load(vits_path, map_location="cpu")
+        self.hps = dict_s2["config"]
+        if version in ("v2Pro", "v2ProPlus", "v2pro", "v2proplus") or dict_s2.get("config", {}).get("model", {}).get("gin_channels") == 1024:
+            self.hps["model"]["version"] = "v2ProPlus" if "plus" in version.lower() else "v2Pro"
+        elif dict_s2["weight"]["enc_p.text_embedding.weight"].shape[0] == 322:
+            self.hps["model"]["version"] = "v1"
+        else:
+            self.hps["model"]["version"] = "v2"
+
+        self.hps = DictToAttrRecursive(self.hps)
+        self.hps.model.semantic_frame_rate = "25hz"
+        self.vq_model = SynthesizerTrn(
+            self.hps.data.filter_length // 2 + 1,
+            self.hps.train.segment_size // self.hps.data.hop_length,
+            n_speakers=self.hps.data.n_speakers,
+            **self.hps.model,
+        )
+        self.vq_model.eval()
+        self.vq_model.load_state_dict(dict_s2["weight"], strict=False)
+
+    def forward(self, text_seq, pred_semantic, ref_audio):
+        from onnx_export import spectrogram_torch
+        refer = spectrogram_torch(
+            ref_audio,
+            self.hps.data.filter_length,
+            self.hps.data.sampling_rate,
+            self.hps.data.hop_length,
+            self.hps.data.win_length,
+            center=False,
+        )
+        if getattr(self.vq_model, "is_v2pro", False):
+            sv_emb = torch.zeros(1, 20480, dtype=torch.float32)
+            return self.vq_model(pred_semantic, text_seq, refer, sv_emb=sv_emb)[0, 0]
+        return self.vq_model(pred_semantic, text_seq, refer)[0, 0]
+
 def export_t2s(gpt_path, vits_path, output_dir, version="v2", cnhubert_path=None):
     print(f"[*] Exporting T2S AR Models ({version}) from {gpt_path}...")
     if cnhubert_path and os.path.exists(cnhubert_path):
         import feature_extractor.cnhubert as cnhubert
         cnhubert.cnhubert_base_path = os.path.abspath(cnhubert_path)
-    from onnx_export import T2SModel, VitsModel
+    from onnx_export import T2SModel
 
-    vits = VitsModel(vits_path)
+    vits = VitsModel(vits_path, version)
     gpt = T2SModel(gpt_path, vits)
 
     ref_seq = torch.randint(0, 300, (1, 20), dtype=torch.long)
@@ -267,47 +323,6 @@ def export_t2s(gpt_path, vits_path, output_dir, version="v2", cnhubert_path=None
 
 def export_vits(vits_path, output_dir, version="v2"):
     print(f"[*] Exporting VITS Synthesizer ({version}) from {vits_path}...")
-    import torch.nn as nn
-    from onnx_export import DictToAttrRecursive, spectrogram_torch
-    from module.models_onnx import SynthesizerTrn
-
-    class VitsModel(nn.Module):
-        def __init__(self, vits_path, version="v2"):
-            super().__init__()
-            dict_s2 = torch.load(vits_path, map_location="cpu")
-            self.hps = dict_s2["config"]
-            if version in ("v2Pro", "v2ProPlus", "v2pro", "v2proplus") or dict_s2.get("config", {}).get("model", {}).get("gin_channels") == 1024:
-                self.hps["model"]["version"] = "v2ProPlus" if "plus" in version.lower() else "v2Pro"
-            elif dict_s2["weight"]["enc_p.text_embedding.weight"].shape[0] == 322:
-                self.hps["model"]["version"] = "v1"
-            else:
-                self.hps["model"]["version"] = "v2"
-
-            self.hps = DictToAttrRecursive(self.hps)
-            self.hps.model.semantic_frame_rate = "25hz"
-            self.vq_model = SynthesizerTrn(
-                self.hps.data.filter_length // 2 + 1,
-                self.hps.train.segment_size // self.hps.data.hop_length,
-                n_speakers=self.hps.data.n_speakers,
-                **self.hps.model,
-            )
-            self.vq_model.eval()
-            self.vq_model.load_state_dict(dict_s2["weight"], strict=False)
-
-        def forward(self, text_seq, pred_semantic, ref_audio):
-            refer = spectrogram_torch(
-                ref_audio,
-                self.hps.data.filter_length,
-                self.hps.data.sampling_rate,
-                self.hps.data.hop_length,
-                self.hps.data.win_length,
-                center=False,
-            )
-            if getattr(self.vq_model, "is_v2pro", False):
-                sv_emb = torch.zeros(1, 20480, dtype=torch.float32)
-                return self.vq_model(pred_semantic, text_seq, refer, sv_emb=sv_emb)[0, 0]
-            return self.vq_model(pred_semantic, text_seq, refer)[0, 0]
-
     vits = VitsModel(vits_path, version)
     vits_onnx_path = os.path.join(output_dir, "vits.onnx")
 

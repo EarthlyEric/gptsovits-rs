@@ -8,9 +8,9 @@
 # ]
 # ///
 """
-GPT-SoVITS Pretrained Models Downloader
+GPT-SoVITS Pretrained & Fine-tuned Models Downloader
 Downloads official pretrained model weights from HuggingFace, HF-Mirror, or ModelScope for fresh environments.
-Supports: Base, v1, v2, v2Pro, v2ProPlus, v3, v4
+Supports: Base, v1, v2, v2Pro, v2ProPlus, v3, v4, and custom character models (e.g. sandrone).
 """
 
 import os
@@ -24,37 +24,43 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
 default_target_dir = os.path.join(project_root, "GPT-SoVITS", "GPT_SoVITS", "pretrained_models")
 
-# Model file mappings from Hugging Face repo: lj1995/GPT-SoVITS
+# Model file mappings: (repo_id, rel_url, rel_dest)
 MODELS_MANIFEST = {
     "base": [
-        ("chinese-hubert-base/config.json", "chinese-hubert-base/config.json"),
-        ("chinese-hubert-base/pytorch_model.bin", "chinese-hubert-base/pytorch_model.bin"),
-        ("chinese-hubert-base/preprocessor_config.json", "chinese-hubert-base/preprocessor_config.json"),
-        ("chinese-roberta-wwm-ext-large/config.json", "chinese-roberta-wwm-ext-large/config.json"),
-        ("chinese-roberta-wwm-ext-large/pytorch_model.bin", "chinese-roberta-wwm-ext-large/pytorch_model.bin"),
-        ("chinese-roberta-wwm-ext-large/tokenizer.json", "chinese-roberta-wwm-ext-large/tokenizer.json"),
+        ("lj1995/GPT-SoVITS", "chinese-hubert-base/config.json", "chinese-hubert-base/config.json"),
+        ("lj1995/GPT-SoVITS", "chinese-hubert-base/pytorch_model.bin", "chinese-hubert-base/pytorch_model.bin"),
+        ("lj1995/GPT-SoVITS", "chinese-hubert-base/preprocessor_config.json", "chinese-hubert-base/preprocessor_config.json"),
+        ("lj1995/GPT-SoVITS", "chinese-roberta-wwm-ext-large/config.json", "chinese-roberta-wwm-ext-large/config.json"),
+        ("lj1995/GPT-SoVITS", "chinese-roberta-wwm-ext-large/pytorch_model.bin", "chinese-roberta-wwm-ext-large/pytorch_model.bin"),
+        ("lj1995/GPT-SoVITS", "chinese-roberta-wwm-ext-large/tokenizer.json", "chinese-roberta-wwm-ext-large/tokenizer.json"),
     ],
     "v1": [
-        ("s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"),
-        ("s2G488k.pth", "s2G488k.pth"),
+        ("lj1995/GPT-SoVITS", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"),
+        ("lj1995/GPT-SoVITS", "s2G488k.pth", "s2G488k.pth"),
     ],
     "v2": [
-        ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt"),
-        ("gsv-v2final-pretrained/s2G2333k.pth", "gsv-v2final-pretrained/s2G2333k.pth"),
+        ("lj1995/GPT-SoVITS", "gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt"),
+        ("lj1995/GPT-SoVITS", "gsv-v2final-pretrained/s2G2333k.pth", "gsv-v2final-pretrained/s2G2333k.pth"),
     ],
     "v2pro": [
-        ("v2Pro/s2Gv2Pro.pth", "v2Pro/s2Gv2Pro.pth"),
-        ("v2Pro/s2Gv2ProPlus.pth", "v2Pro/s2Gv2ProPlus.pth"),
-        ("sv/pretrained_eres2netv2w24s4ep4.ckpt", "sv/pretrained_eres2netv2w24s4ep4.ckpt"),
+        ("lj1995/GPT-SoVITS", "v2Pro/s2Gv2Pro.pth", "v2Pro/s2Gv2Pro.pth"),
+        ("lj1995/GPT-SoVITS", "v2Pro/s2Gv2ProPlus.pth", "v2Pro/s2Gv2ProPlus.pth"),
+        ("lj1995/GPT-SoVITS", "sv/pretrained_eres2netv2w24s4ep4.ckpt", "sv/pretrained_eres2netv2w24s4ep4.ckpt"),
     ],
     "v3": [
-        ("s1v3.ckpt", "s1v3.ckpt"),
-        ("s2Gv3.pth", "s2Gv3.pth"),
+        ("lj1995/GPT-SoVITS", "s1v3.ckpt", "s1v3.ckpt"),
+        ("lj1995/GPT-SoVITS", "s2Gv3.pth", "s2Gv3.pth"),
     ],
     "v4": [
-        ("s1v3.ckpt", "s1v3.ckpt"),
-        ("gsv-v4-pretrained/s2Gv4.pth", "gsv-v4-pretrained/s2Gv4.pth"),
-        ("gsv-v4-pretrained/vocoder.pth", "gsv-v4-pretrained/vocoder.pth"),
+        ("lj1995/GPT-SoVITS", "s1v3.ckpt", "s1v3.ckpt"),
+        ("lj1995/GPT-SoVITS", "gsv-v4-pretrained/s2Gv4.pth", "gsv-v4-pretrained/s2Gv4.pth"),
+        ("lj1995/GPT-SoVITS", "gsv-v4-pretrained/vocoder.pth", "gsv-v4-pretrained/vocoder.pth"),
+    ],
+    "sandrone": [
+        ("EarthlyEric6/Sandrone_gptsovits", "GPT_weights_v2ProPlus/Sandrone_v2proplus-e15.ckpt", "sandrone/Sandrone_v2proplus-e15.ckpt"),
+        ("EarthlyEric6/Sandrone_gptsovits", "SoVITS_weights_v2ProPlus/Sandrone_v2proplus_e8_s1368.pth", "sandrone/Sandrone_v2proplus_e8_s1368.pth"),
+        ("EarthlyEric6/Sandrone_gptsovits", "sandrone_ref.wav", "__VOICES__/sandrone/ref.wav"),
+        ("EarthlyEric6/Sandrone_gptsovits", "sandrone_ref_text.txt", "__VOICES__/sandrone/ref.txt"),
     ],
 }
 
@@ -105,22 +111,22 @@ def download_file(url, target_path, resume=True):
         print(f"[!] Download failed for {url}: {e}")
         return False
 
-def get_base_url(source):
+def get_base_url(source, repo="lj1995/GPT-SoVITS"):
     if source == "hf-mirror":
-        return "https://hf-mirror.com/lj1995/GPT-SoVITS/resolve/main"
-    elif source == "modelscope":
+        return f"https://hf-mirror.com/{repo}/resolve/main"
+    elif source == "modelscope" and repo == "lj1995/GPT-SoVITS":
         return "https://www.modelscope.cn/api/v1/models/iic/GPT-SoVITS/repo?Revision=master&FilePath="
     else:
-        return "https://huggingface.co/lj1995/GPT-SoVITS/resolve/main"
+        return f"https://huggingface.co/{repo}/resolve/main"
 
 def main():
-    parser = argparse.ArgumentParser(description="GPT-SoVITS Pretrained Models Downloader")
+    parser = argparse.ArgumentParser(description="GPT-SoVITS Pretrained & Fine-tuned Models Downloader")
     parser.add_argument(
         "--version",
         type=str,
         default="all",
-        choices=["all", "base", "v1", "v2", "v2pro", "v2proplus", "v3", "v4"],
-        help="Target model version to download (default: all)",
+        choices=["all", "base", "v1", "v2", "v2pro", "v2proplus", "v3", "v4", "sandrone"],
+        help="Target model version / character to download (default: all)",
     )
     parser.add_argument(
         "--source",
@@ -153,6 +159,8 @@ def main():
         categories = ["base", "v2", "v2pro"]
     elif args.version in ("v3", "v4"):
         categories = ["base", "v3", args.version]
+    elif args.version == "sandrone":
+        categories = ["base", "sandrone"]
     else:
         categories = ["base", args.version]
 
@@ -162,10 +170,8 @@ def main():
         if cat in MODELS_MANIFEST:
             files_to_download.extend(MODELS_MANIFEST[cat])
 
-    base_url = get_base_url(args.source)
-
     print("==========================================================")
-    print("  GPT-SoVITS Pretrained Model Downloader (uv compatible)")
+    print("  GPT-SoVITS Model Downloader (uv compatible)")
     print(f"  Target Version: {args.version}")
     print(f"  Source Mirror:  {args.source}")
     print(f"  Target Path:    {args.target_dir}")
@@ -175,21 +181,26 @@ def main():
     os.makedirs(args.target_dir, exist_ok=True)
 
     success_count = 0
-    for rel_url, rel_dest in files_to_download:
-        dest_path = os.path.join(args.target_dir, rel_dest)
+    for repo_id, rel_url, rel_dest in files_to_download:
+        if rel_dest.startswith("__VOICES__/"):
+            voice_rel = rel_dest.replace("__VOICES__/", "")
+            dest_path = os.path.join(project_root, "voices", voice_rel)
+        else:
+            dest_path = os.path.join(args.target_dir, rel_dest)
         
         # Check if file already exists
-        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 1024:
-            print(f"[✓] Already exists: {rel_dest}")
+        if os.path.exists(dest_path) and os.path.getsize(dest_path) > 10:
+            print(f"[✓] Already exists: {os.path.basename(dest_path)}")
             success_count += 1
             continue
 
-        if args.source == "modelscope":
+        base_url = get_base_url(args.source, repo_id)
+        if args.source == "modelscope" and repo_id == "lj1995/GPT-SoVITS":
             url = f"{base_url}{rel_url}"
         else:
             url = f"{base_url}/{rel_url}?download=true"
 
-        print(f"\n[*] Downloading: {rel_dest}")
+        print(f"\n[*] Downloading: {os.path.basename(dest_path)} (from {repo_id})")
         if download_file(url, dest_path):
             success_count += 1
         else:
@@ -203,42 +214,57 @@ def main():
     if args.export_onnx:
         import shutil
         exporter_script = os.path.join(script_dir, "onnx_exporter.py")
-        raw_ver = "v2" if args.version in ("all", "base") else args.version
-        canonical_map = {
-            "v1": "v1",
-            "v2": "v2",
-            "v2pro": "v2Pro",
-            "v2proplus": "v2ProPlus",
-            "v3": "v3",
-            "v4": "v4",
-        }
-        export_ver = canonical_map.get(raw_ver.lower(), raw_ver)
-        print(f"\n[*] Triggering ONNX export for version: {export_ver}...")
         uv_cmd = shutil.which("uv")
-        cmd = [uv_cmd, "run", exporter_script] if uv_cmd else [sys.executable, exporter_script]
-        cmd.extend([
-            "--version", export_ver,
+        base_cmd = [uv_cmd, "run", exporter_script] if uv_cmd else [sys.executable, exporter_script]
+        base_cmd.extend([
             "--cnhubert-path", os.path.join(args.target_dir, "chinese-hubert-base"),
             "--bert-path", os.path.join(args.target_dir, "chinese-roberta-wwm-ext-large"),
             "--output-dir", "models",
         ])
 
-        version_checkpoints = {
-            "v1": ("s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s2G488k.pth"),
-            "v2": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "gsv-v2final-pretrained/s2G2333k.pth"),
-            "v2pro": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2Pro.pth"),
-            "v2proplus": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2ProPlus.pth"),
-            "v3": ("s1v3.ckpt", "s2Gv3.pth"),
-            "v4": ("s1v3.ckpt", "gsv-v4-pretrained/s2Gv4.pth"),
-        }
-        if export_ver.lower() in version_checkpoints:
-            gpt_rel, sovits_rel = version_checkpoints[export_ver.lower()]
-            gpt_p = os.path.join(args.target_dir, gpt_rel)
-            sovits_p = os.path.join(args.target_dir, sovits_rel)
-            if os.path.exists(gpt_p) and os.path.exists(sovits_p):
-                cmd.extend(["--gpt-path", gpt_p, "--sovits-path", sovits_p])
+        if args.version.lower() == "sandrone":
+            print(f"\n[*] Triggering ONNX export for Sandrone custom fine-tuned model...")
+            gpt_p = os.path.join(args.target_dir, "sandrone", "Sandrone_v2proplus-e15.ckpt")
+            sovits_p = os.path.join(args.target_dir, "sandrone", "Sandrone_v2proplus_e8_s1368.pth")
+            cmd = list(base_cmd)
+            cmd.extend([
+                "--version", "v2ProPlus",
+                "--custom-name", "sandrone",
+                "--gpt-path", gpt_p,
+                "--sovits-path", sovits_p,
+            ])
+            subprocess.run(cmd)
+        else:
+            raw_ver = "v2" if args.version in ("all", "base") else args.version
+            canonical_map = {
+                "v1": "v1",
+                "v2": "v2",
+                "v2pro": "v2Pro",
+                "v2proplus": "v2ProPlus",
+                "v3": "v3",
+                "v4": "v4",
+            }
+            export_ver = canonical_map.get(raw_ver.lower(), raw_ver)
+            print(f"\n[*] Triggering ONNX export for version: {export_ver}...")
+            cmd = list(base_cmd)
+            cmd.extend(["--version", export_ver])
 
-        subprocess.run(cmd)
+            version_checkpoints = {
+                "v1": ("s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s2G488k.pth"),
+                "v2": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "gsv-v2final-pretrained/s2G2333k.pth"),
+                "v2pro": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2Pro.pth"),
+                "v2proplus": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2ProPlus.pth"),
+                "v3": ("s1v3.ckpt", "s2Gv3.pth"),
+                "v4": ("s1v3.ckpt", "gsv-v4-pretrained/s2Gv4.pth"),
+            }
+            if export_ver.lower() in version_checkpoints:
+                gpt_rel, sovits_rel = version_checkpoints[export_ver.lower()]
+                gpt_p = os.path.join(args.target_dir, gpt_rel)
+                sovits_p = os.path.join(args.target_dir, sovits_rel)
+                if os.path.exists(gpt_p) and os.path.exists(sovits_p):
+                    cmd.extend(["--gpt-path", gpt_p, "--sovits-path", sovits_p])
+
+            subprocess.run(cmd)
 
 if __name__ == "__main__":
     main()
