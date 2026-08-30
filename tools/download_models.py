@@ -211,6 +211,22 @@ def main():
             "--bert-path", os.path.join(args.target_dir, "chinese-roberta-wwm-ext-large"),
             "--output-dir", "models",
         ])
+
+        version_checkpoints = {
+            "v1": ("s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s2G488k.pth"),
+            "v2": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "gsv-v2final-pretrained/s2G2333k.pth"),
+            "v2pro": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2Pro.pth"),
+            "v2proplus": ("gsv-v2final-pretrained/s1bert25hz-5kh-longer-epoch=12-step=369668.ckpt", "v2Pro/s2Gv2ProPlus.pth"),
+            "v3": ("s1v3.ckpt", "s2Gv3.pth"),
+            "v4": ("s1v3.ckpt", "gsv-v4-pretrained/s2Gv4.pth"),
+        }
+        if export_ver.lower() in version_checkpoints:
+            gpt_rel, sovits_rel = version_checkpoints[export_ver.lower()]
+            gpt_p = os.path.join(args.target_dir, gpt_rel)
+            sovits_p = os.path.join(args.target_dir, sovits_rel)
+            if os.path.exists(gpt_p) and os.path.exists(sovits_p):
+                cmd.extend(["--gpt-path", gpt_p, "--sovits-path", sovits_p])
+
         subprocess.run(cmd)
 
 if __name__ == "__main__":

@@ -5,6 +5,11 @@
 #     "torch>=2.1.0",
 #     "torchaudio>=2.1.0",
 #     "transformers>=4.40.0",
+#     "pytorch-lightning>=2.0.0",
+#     "torchmetrics>=1.0.0",
+#     "matplotlib>=3.7.0",
+#     "x_transformers>=1.30.0",
+#     "rotary_embedding_torch>=0.5.0",
 #     "onnx>=1.15.0",
 #     "onnxruntime>=1.17.0",
 #     "onnxscript>=0.1.0",
@@ -35,9 +40,58 @@ import json
 # Add GPT-SoVITS directory to path
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
-gpt_sovits_dir = os.path.join(project_root, "GPT-SoVITS")
-sys.path.insert(0, gpt_sovits_dir)
-sys.path.insert(0, os.path.join(gpt_sovits_dir, "GPT_SoVITS"))
+
+def ensure_gpt_sovits_repo():
+    candidates = [
+        os.path.join(project_root, "GPT-SoVITS"),
+        os.path.join(project_root, "GPT-SoVITS-src"),
+        "/tmp/gpt-sovits-upstream",
+    ]
+    for c in candidates:
+        if os.path.exists(os.path.join(c, "GPT_SoVITS", "onnx_export.py")):
+            if c not in sys.path:
+                sys.path.insert(0, c)
+            p = os.path.join(c, "GPT_SoVITS")
+            if p not in sys.path:
+                sys.path.insert(0, p)
+
+            # Ensure GPT_SoVITS link exists in project root for upstream relative paths
+            src_pretrained = os.path.join(project_root, "GPT-SoVITS", "GPT_SoVITS")
+            link_dir = os.path.join(project_root, "GPT_SoVITS")
+            if os.path.exists(src_pretrained) and not os.path.exists(link_dir):
+                try:
+                    os.symlink(src_pretrained, link_dir)
+                except Exception:
+                    pass
+            return c
+
+    # Clone into GPT-SoVITS-src if not existing
+    target = os.path.join(project_root, "GPT-SoVITS-src")
+    print("[*] Cloning GPT-SoVITS upstream code for model architectures...")
+    import subprocess
+    try:
+        subprocess.run(["git", "clone", "--depth", "1", "https://github.com/RVC-Boss/GPT-SoVITS.git", target], check=True)
+    except Exception:
+        subprocess.run(["git", "clone", "--depth", "1", "https://gitee.com/hf-models/GPT-SoVITS.git", target], check=True)
+
+    if target not in sys.path:
+        sys.path.insert(0, target)
+    p = os.path.join(target, "GPT_SoVITS")
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+    # Ensure GPT_SoVITS link exists in project root
+    src_pretrained = os.path.join(project_root, "GPT-SoVITS", "GPT_SoVITS")
+    link_dir = os.path.join(project_root, "GPT_SoVITS")
+    if os.path.exists(src_pretrained) and not os.path.exists(link_dir):
+        try:
+            os.symlink(src_pretrained, link_dir)
+        except Exception:
+            pass
+
+    return target
+
+ensure_gpt_sovits_repo()
 
 try:
     import torch
@@ -127,8 +181,11 @@ def export_roberta(bert_path, output_path, output_tok_path):
     )
     print(f"[+] RoBERTa exported successfully: {output_path}")
 
-def export_t2s(gpt_path, vits_path, output_dir, version="v2"):
+def export_t2s(gpt_path, vits_path, output_dir, version="v2", cnhubert_path=None):
     print(f"[*] Exporting T2S AR Models ({version}) from {gpt_path}...")
+    if cnhubert_path and os.path.exists(cnhubert_path):
+        import feature_extractor.cnhubert as cnhubert
+        cnhubert.cnhubert_base_path = os.path.abspath(cnhubert_path)
     from onnx_export import T2SModel, VitsModel
 
     vits = VitsModel(vits_path)
@@ -161,6 +218,7 @@ def export_t2s(gpt_path, vits_path, output_dir, version="v2"):
             "prompts": {1: "prompts_length"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] Exported t2s_encoder.onnx: {enc_path}")
@@ -178,6 +236,7 @@ def export_t2s(gpt_path, vits_path, output_dir, version="v2"):
             "prompts": {1: "prompts_length"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] Exported t2s_fsdec.onnx: {fsdec_path}")
@@ -198,6 +257,7 @@ def export_t2s(gpt_path, vits_path, output_dir, version="v2"):
             "ix_example": {1: "ix_example_length"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] Exported t2s_sdec.onnx: {sdec_path}")
@@ -226,6 +286,7 @@ def export_vits(vits_path, output_dir, version="v2"):
             "audio": {1: "out_length"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] Exported vits.onnx: {vits_onnx_path}")
@@ -265,7 +326,7 @@ def main():
 
     # 3. T2S & VITS
     if args.gpt_path and args.sovits_path:
-        export_t2s(args.gpt_path, args.sovits_path, out_version_dir, args.version)
+        export_t2s(args.gpt_path, args.sovits_path, out_version_dir, args.version, args.cnhubert_path)
         export_vits(args.sovits_path, out_version_dir, args.version)
 
     print("\n[✓] Export completed successfully!")

@@ -9,7 +9,12 @@
 # Large Model Weights and Checkpoints (ONNX, PyTorch, etc.)
 # ==============================================================================
 /models/
+/GPT-SoVITS
 /GPT-SoVITS/
+/GPT-SoVITS-src
+/GPT-SoVITS-src/
+/GPT_SoVITS
+/GPT_SoVITS/
 *.onnx
 *.pth
 *.ckpt
