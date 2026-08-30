@@ -1,7 +1,7 @@
 # ==============================================================================
-# Stage 1: Build binary using official Rust toolchain
+# Stage 1: Build binary using official Rust toolchain (Rust 1.85+ with Edition 2024 support)
 # ==============================================================================
-FROM rust:1.80-bullseye AS builder
+FROM rust:bookworm AS builder
 
 WORKDIR /usr/src/gptsovits-rs
 
@@ -28,19 +28,19 @@ RUN cargo build --release
 # ==============================================================================
 # Stage 2: Minimal runtime image
 # ==============================================================================
-FROM debian:bullseye-slim AS runtime
+FROM debian:bookworm-slim AS runtime
 
 LABEL org.opencontainers.image.title="gptsovits-rs"
 LABEL org.opencontainers.image.description="Pure Rust Inference Engine & OpenAI-compatible TTS Server for GPT-SoVITS"
 LABEL org.opencontainers.image.authors="earthlyeric6"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Install runtime utilities: ffmpeg for audio transcoding, ca-certificates, curl for healthcheck
+# Install runtime utilities: ffmpeg for audio transcoding, ca-certificates, curl for healthcheck, libssl3
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     ffmpeg \
     curl \
-    libssl1.1 \
+    libssl3 \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
