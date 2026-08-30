@@ -7,6 +7,7 @@
 #     "transformers>=4.40.0",
 #     "onnx>=1.15.0",
 #     "onnxruntime>=1.17.0",
+#     "onnxscript>=0.1.0",
 #     "scipy>=1.11.0",
 #     "numpy>=1.24.0",
 #     "soundfile>=0.12.0",
@@ -47,9 +48,8 @@ except ImportError:
 
 def export_cnhubert(cnhubert_path, output_path):
     print(f"[*] Exporting CNHuBERT SSL Model from {cnhubert_path} to {output_path}...")
-    from feature_extractor import cnhubert
-    cnhubert.cnhubert_base_path = cnhubert_path
-    ssl_model = cnhubert.get_model()
+    from transformers import HubertModel
+    ssl_model = HubertModel.from_pretrained(cnhubert_path).float().eval()
 
     class SSLWrapper(torch.nn.Module):
         def __init__(self, model):
@@ -57,10 +57,10 @@ def export_cnhubert(cnhubert_path, output_path):
             self.model = model
 
         def forward(self, ref_audio_16k):
-            return self.model.model(ref_audio_16k)["last_hidden_state"].transpose(1, 2)
+            return self.model(ref_audio_16k)["last_hidden_state"].transpose(1, 2)
 
     wrapper = SSLWrapper(ssl_model).eval()
-    dummy_audio = torch.randn(1, 16000 * 3) # 3 seconds
+    dummy_audio = torch.randn(1, 16000 * 3, dtype=torch.float32) # 3 seconds
 
     torch.onnx.export(
         wrapper,
@@ -73,6 +73,7 @@ def export_cnhubert(cnhubert_path, output_path):
             "ssl_content": {2: "ssl_length"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] CNHuBERT exported successfully: {output_path}")
@@ -80,12 +81,13 @@ def export_cnhubert(cnhubert_path, output_path):
 def export_roberta(bert_path, output_path, output_tok_path):
     print(f"[*] Exporting Chinese-RoBERTa Model from {bert_path} to {output_path}...")
     tokenizer = AutoTokenizer.from_pretrained(bert_path)
-    model = AutoModelForMaskedLM.from_pretrained(bert_path).eval()
+    model = AutoModelForMaskedLM.from_pretrained(bert_path).float().eval()
 
     # Save tokenizer.json
     tokenizer.save_pretrained(os.path.dirname(output_tok_path))
-    if hasattr(tokenizer, "save_vocabulary"):
-        tokenizer.save_vocabulary(os.path.dirname(output_tok_path))
+    src_tok = os.path.join(bert_path, "tokenizer.json")
+    if os.path.exists(src_tok) and not os.path.exists(output_tok_path):
+        shutil.copyfile(src_tok, output_tok_path)
 
     class BertWrapper(torch.nn.Module):
         def __init__(self, model):
@@ -120,6 +122,7 @@ def export_roberta(bert_path, output_path, output_tok_path):
             "hidden_states": {1: "seq_len"},
         },
         opset_version=17,
+        dynamo=False,
         verbose=False,
     )
     print(f"[+] RoBERTa exported successfully: {output_path}")

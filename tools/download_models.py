@@ -33,7 +33,6 @@ MODELS_MANIFEST = {
         ("chinese-roberta-wwm-ext-large/config.json", "chinese-roberta-wwm-ext-large/config.json"),
         ("chinese-roberta-wwm-ext-large/pytorch_model.bin", "chinese-roberta-wwm-ext-large/pytorch_model.bin"),
         ("chinese-roberta-wwm-ext-large/tokenizer.json", "chinese-roberta-wwm-ext-large/tokenizer.json"),
-        ("chinese-roberta-wwm-ext-large/vocab.txt", "chinese-roberta-wwm-ext-large/vocab.txt"),
     ],
     "v1": [
         ("s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"),
@@ -148,6 +147,8 @@ def main():
     categories = []
     if args.version == "all":
         categories = list(MODELS_MANIFEST.keys())
+    elif args.version == "base":
+        categories = ["base"]
     elif args.version in ("v2proplus", "v2pro"):
         categories = ["base", "v2pro"]
     else:
@@ -198,17 +199,19 @@ def main():
 
     # Optional: trigger ONNX export
     if args.export_onnx:
+        import shutil
         exporter_script = os.path.join(script_dir, "onnx_exporter.py")
         export_ver = "v2" if args.version in ("all", "base") else args.version
         print(f"\n[*] Triggering ONNX export for version: {export_ver}...")
-        subprocess.run([
-            sys.executable,
-            exporter_script,
+        uv_cmd = shutil.which("uv")
+        cmd = [uv_cmd, "run", exporter_script] if uv_cmd else [sys.executable, exporter_script]
+        cmd.extend([
             "--version", export_ver,
             "--cnhubert-path", os.path.join(args.target_dir, "chinese-hubert-base"),
             "--bert-path", os.path.join(args.target_dir, "chinese-roberta-wwm-ext-large"),
             "--output-dir", "models",
         ])
+        subprocess.run(cmd)
 
 if __name__ == "__main__":
     main()
