@@ -1,0 +1,74 @@
+[server]
+bind_address = "0.0.0.0"
+port = 9880
+api_key = "" # Leave empty to disable bearer auth, or set your API key
+max_concurrency = 8
+voices_config = "voices.toml"
+
+[runtime]
+device = "cuda" # "cuda" or "cpu"
+intra_threads = 4
+inter_threads = 2
+
+[models]
+default_version = "v2" # "v1", "v2", "v2Pro", "v2ProPlus", "v3", "v4"
+cnhubert_path = "models/chinese-hubert-base/cnhubert.onnx"
+bert_path = "models/chinese-roberta-wwm-ext-large/bert.onnx"
+bert_tokenizer_path = "models/chinese-roberta-wwm-ext-large/tokenizer.json"
+
+# ==============================================================================
+# 官方底模配置 (Official Base Models)
+# ==============================================================================
+[models.v1]
+t2s_encoder_path = "models/v1/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v1/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v1/t2s_sdec.onnx"
+vits_path = "models/v1/vits.onnx"
+sampling_rate = 32000
+
+[models.v2]
+t2s_encoder_path = "models/v2/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v2/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v2/t2s_sdec.onnx"
+vits_path = "models/v2/vits.onnx"
+sampling_rate = 32000
+
+[models.v2Pro]
+t2s_encoder_path = "models/v2Pro/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v2Pro/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v2Pro/t2s_sdec.onnx"
+vits_path = "models/v2Pro/vits.onnx"
+sampling_rate = 32000
+
+[models.v2ProPlus]
+t2s_encoder_path = "models/v2ProPlus/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v2ProPlus/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v2ProPlus/t2s_sdec.onnx"
+vits_path = "models/v2ProPlus/vits.onnx"
+sampling_rate = 32000
+
+[models.v3]
+t2s_encoder_path = "models/v3/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v3/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v3/t2s_sdec.onnx"
+dit_path = "models/v3/dit.onnx"
+vocoder_path = "models/v3/bigvgan.onnx"
+sampling_rate = 24000
+sample_steps = 32
+
+[models.v4]
+t2s_encoder_path = "models/v4/t2s_encoder.onnx"
+t2s_fsdec_path = "models/v4/t2s_fsdec.onnx"
+t2s_sdec_path = "models/v4/t2s_sdec.onnx"
+dit_path = "models/v4/dit.onnx"
+vocoder_path = "models/v4/vocoder.onnx"
+sampling_rate = 48000
+sample_steps = 16
+
+# ==============================================================================
+# 自訂角色微調模型配置 (Custom Fine-tuned Models)
+# ==============================================================================
+[models.custom.sandrone]
+model_version = "v2ProPlus"
+model_dir = "models/sandrone"
+sampling_rate = 32000

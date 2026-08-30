@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  gptsovits-rs:
+    image: ghcr.io/earthlyeric6/gptsovits-rs:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gptsovits-rs
+    restart: unless-stopped
+    ports:
+      - "9880:9880"
+    volumes:
+      - ./config.toml:/app/config.toml:ro
+      - ./voices.toml:/app/voices.toml:ro
+      - ./models:/app/models
+      - ./voices:/app/voices
+    environment:
+      - RUST_LOG=info,gptsovits_rs=info,tower_http=info,axum=info
+    # NVIDIA GPU Acceleration (Optional: requires nvidia-container-toolkit)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
