@@ -82,7 +82,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: /tmp/ort-dist
-          key: ort-cuda12.8-v1.22.2-v1
+          key: ort-cuda12.8-v1.28.0-v1
 
       - name: Build ONNX Runtime from Source
         if: steps.cache-ort.outputs.cache-hit != 'true'
@@ -95,7 +95,7 @@ jobs:
           # v1.22.1+ switched the Eigen dependency from a GitLab-generated tarball
           # (non-deterministic, caused periodic SHA1 hash mismatches) to a stable
           # GitHub mirror, so no manual Eigen workaround is needed anymore.
-          git clone --depth 1 --branch v1.22.2 --recursive https://github.com/microsoft/onnxruntime.git /tmp/onnxruntime
+          git clone --depth 1 --branch v1.28.0 --recursive https://github.com/microsoft/onnxruntime.git /tmp/onnxruntime
 
           cd /tmp/onnxruntime
           # 

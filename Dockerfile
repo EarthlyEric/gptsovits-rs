@@ -74,11 +74,17 @@ RUN mkdir -p /app/models /app/voices
 # Copy binary from builder
 COPY --from=builder /usr/src/gptsovits-rs/target/release/gptsovits-rs /usr/local/bin/gptsovits-rs
 
-# Copy ONNX runtime dynamic libraries if produced during build
-COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime* /usr/local/lib/
+# Keep provider libraries next to the executable, where ONNX Runtime discovers them.
+COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime_providers_*.so /usr/local/bin/
 
-# Copy custom ONNX runtime libraries if provided in build context (e.g. from GitHub Actions CI)
-COPY ort_libs* /usr/local/lib/
+# Copy custom CUDA ONNX Runtime libraries if provided in build context (e.g. from GitHub Actions CI).
+COPY ort_libs/ /usr/local/lib/
+
+# CI artifacts are copied to /usr/local/lib first, then moved to the same directory
+# as the executable for the provider loader.
+RUN for provider in /usr/local/lib/libonnxruntime_providers_*.so; do \
+        if [ -e "$provider" ]; then mv "$provider" /usr/local/bin/; fi; \
+    done
 
 # Copy default configurations
 COPY config.toml /app/config.toml
