@@ -8,25 +8,43 @@ use std::sync::Mutex;
 pub struct CfmV3V4Model {
     dit_session: Mutex<Option<Session>>,
     vocoder_session: Mutex<Option<Session>>,
-    sampling_rate: u32,
     default_sample_steps: usize,
 }
 
 fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
+        tracing::warn!(path = %path_ref.display(), "CFM/Vocoder ONNX model file not found");
         return None;
     }
-    let builder = Session::builder().map_err(|e| anyhow!("{}", e)).ok()?;
-    let mut builder = builder.with_intra_threads(threads).map_err(|e| anyhow!("{}", e)).ok()?;
-    builder.commit_from_file(path_ref).map_err(|e| anyhow!("{}", e)).ok()
+    let builder = match Session::builder() {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to create CFM/Vocoder ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_intra_threads(threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure CFM/Vocoder ONNX session");
+            return None;
+        }
+    };
+    match builder.commit_from_file(path_ref) {
+        Ok(session) => Some(session),
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to load CFM/Vocoder ONNX model");
+            None
+        }
+    }
 }
 
 impl CfmV3V4Model {
     pub fn new<P: AsRef<Path>>(
         dit_path: P,
         vocoder_path: P,
-        sampling_rate: u32,
+        _sampling_rate: u32,
         default_sample_steps: usize,
     ) -> Self {
         let dit_session = load_session(dit_path, 4);
@@ -35,7 +53,6 @@ impl CfmV3V4Model {
         Self {
             dit_session: Mutex::new(dit_session),
             vocoder_session: Mutex::new(vocoder_session),
-            sampling_rate,
             default_sample_steps,
         }
     }
@@ -48,65 +65,60 @@ impl CfmV3V4Model {
         _ref_audio: &[f32],
         steps: usize,
     ) -> Result<Vec<f32>> {
-        let actual_steps = if steps > 0 { steps } else { self.default_sample_steps };
+        if pred_semantic.is_empty() {
+            return Err(anyhow!("T2S produced no semantic tokens"));
+        }
+
+        let actual_steps = if steps > 0 {
+            steps
+        } else {
+            self.default_sample_steps
+        };
         let mut dit_guard = self.dit_session.lock().unwrap();
         let mut vocoder_guard = self.vocoder_session.lock().unwrap();
 
-        if let (Some(dit), Some(vocoder)) = (dit_guard.as_mut(), vocoder_guard.as_mut()) {
-            let mel_frames = (pred_semantic.len() * 4).max(32);
-            let n_mels = 100;
+        let (Some(dit), Some(vocoder)) = (dit_guard.as_mut(), vocoder_guard.as_mut()) else {
+            return Err(anyhow!("CFM and vocoder models are not fully loaded"));
+        };
 
-            // Initial random noise
-            let mut mel_latent = Array3::<f32>::zeros((1, n_mels, mel_frames));
-            for v in mel_latent.iter_mut() {
-                *v = rand::random::<f32>() * 2.0 - 1.0;
-            }
+        let mel_frames = (pred_semantic.len() * 4).max(32);
+        let n_mels = 100;
 
-            let dt = 1.0 / actual_steps as f32;
+        // Initial random noise
+        let mut mel_latent = Array3::<f32>::zeros((1, n_mels, mel_frames));
+        for v in mel_latent.iter_mut() {
+            *v = rand::random::<f32>() * 2.0 - 1.0;
+        }
 
-            // Euler ODE solver
-            for step in 0..actual_steps {
-                let t = step as f32 * dt;
-                let t_arr = Array2::from_shape_vec((1, 1), vec![t])?;
+        let dt = 1.0 / actual_steps as f32;
 
-                let x_val = Value::from_array(mel_latent.clone())?;
-                let t_val = Value::from_array(t_arr)?;
+        // Euler ODE solver
+        for step in 0..actual_steps {
+            let t = step as f32 * dt;
+            let t_arr = Array2::from_shape_vec((1, 1), vec![t])?;
 
-                let dit_outputs = dit.run(ort::inputs![
-                    "x" => x_val,
-                    "t" => t_val,
-                ])?;
+            let x_val = Value::from_array(mel_latent.clone())?;
+            let t_val = Value::from_array(t_arr)?;
 
-                let (_shape, vt_data) = dit_outputs[0].try_extract_tensor::<f32>()?;
-
-                for (x_val, &vt) in mel_latent.iter_mut().zip(vt_data.iter()) {
-                    *x_val += vt * dt;
-                }
-            }
-
-            // Vocoder synthesis
-            let mel_val = Value::from_array(mel_latent)?;
-            let vocoder_outputs = vocoder.run(ort::inputs![
-                "mel" => mel_val,
+            let dit_outputs = dit.run(ort::inputs![
+                "x" => x_val,
+                "t" => t_val,
             ])?;
 
-            let (_shape, audio_data) = vocoder_outputs[0].try_extract_tensor::<f32>()?;
-            Ok(audio_data.to_vec())
-        } else {
-            // Mock synthesis for V3/V4
-            let duration_secs = (pred_semantic.len() as f32 / 25.0).max(0.5);
-            let num_samples = (duration_secs * self.sampling_rate as f32) as usize;
-            let mut samples = Vec::with_capacity(num_samples);
+            let (_shape, vt_data) = dit_outputs[0].try_extract_tensor::<f32>()?;
 
-            for i in 0..num_samples {
-                let t = i as f32 / self.sampling_rate as f32;
-                let freq = 260.0 + 40.0 * (t * 3.5).sin();
-                let envelope = (t * std::f32::consts::PI / duration_secs).sin().powf(0.5);
-                let sample = (2.0 * std::f32::consts::PI * freq * t).sin() * 0.3 * envelope;
-                samples.push(sample);
+            for (x_val, &vt) in mel_latent.iter_mut().zip(vt_data.iter()) {
+                *x_val += vt * dt;
             }
-
-            Ok(samples)
         }
+
+        // Vocoder synthesis
+        let mel_val = Value::from_array(mel_latent)?;
+        let vocoder_outputs = vocoder.run(ort::inputs![
+            "mel" => mel_val,
+        ])?;
+
+        let (_shape, audio_data) = vocoder_outputs[0].try_extract_tensor::<f32>()?;
+        Ok(audio_data.to_vec())
     }
 }

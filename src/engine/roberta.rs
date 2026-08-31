@@ -12,11 +12,30 @@ pub struct RoBERTaModel {
 fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
+        tracing::warn!(path = %path_ref.display(), "RoBERTa ONNX model file not found");
         return None;
     }
-    let builder = Session::builder().map_err(|e| anyhow!("{}", e)).ok()?;
-    let mut builder = builder.with_intra_threads(threads).map_err(|e| anyhow!("{}", e)).ok()?;
-    builder.commit_from_file(path_ref).map_err(|e| anyhow!("{}", e)).ok()
+    let builder = match Session::builder() {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to create RoBERTa ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_intra_threads(threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure RoBERTa ONNX session");
+            return None;
+        }
+    };
+    match builder.commit_from_file(path_ref) {
+        Ok(session) => Some(session),
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to load RoBERTa ONNX model");
+            None
+        }
+    }
 }
 
 impl RoBERTaModel {
@@ -37,47 +56,46 @@ impl RoBERTaModel {
     ) -> Result<Array2<f32>> {
         let mut session_guard = self.session.lock().unwrap();
 
-        if let Some(session) = session_guard.as_mut() {
-            let seq_len = input_ids.len();
-            let ids_arr = Array2::from_shape_vec((1, seq_len), input_ids.to_vec())?;
-            let mask_arr = Array2::from_shape_vec((1, seq_len), attention_mask.to_vec())?;
-            let type_arr = Array2::from_shape_vec((1, seq_len), token_type_ids.to_vec())?;
+        let session = session_guard
+            .as_mut()
+            .ok_or_else(|| anyhow!("RoBERTa model is not loaded"))?;
+        let seq_len = input_ids.len();
+        let ids_arr = Array2::from_shape_vec((1, seq_len), input_ids.to_vec())?;
+        let mask_arr = Array2::from_shape_vec((1, seq_len), attention_mask.to_vec())?;
+        let type_arr = Array2::from_shape_vec((1, seq_len), token_type_ids.to_vec())?;
 
-            let ids_val = Value::from_array(ids_arr)?;
-            let mask_val = Value::from_array(mask_arr)?;
-            let type_val = Value::from_array(type_arr)?;
+        let ids_val = Value::from_array(ids_arr)?;
+        let mask_val = Value::from_array(mask_arr)?;
+        let type_val = Value::from_array(type_arr)?;
 
-            let outputs = session.run(ort::inputs![
-                "input_ids" => ids_val,
-                "attention_mask" => mask_val,
-                "token_type_ids" => type_val,
-            ])?;
+        let outputs = session.run(ort::inputs![
+            "input_ids" => ids_val,
+            "attention_mask" => mask_val,
+            "token_type_ids" => type_val,
+        ])?;
 
-            let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
-            let shape_slice = shape.as_ref();
-
-            if shape_slice.len() == 3 && shape_slice[1] >= 2 {
-                let seq_dim = shape_slice[1] as usize;
-                let hidden_dim = shape_slice[2] as usize;
-                let num_chars = seq_dim - 2; // exclude [CLS] and [SEP]
-                let mut char_embeddings = Vec::with_capacity(num_chars * hidden_dim);
-
-                // Slice data[1..-1]
-                for char_idx in 1..seq_dim - 1 {
-                    let start = char_idx * hidden_dim;
-                    let end = start + hidden_dim;
-                    char_embeddings.extend_from_slice(&data[start..end]);
-                }
-
-                Array2::from_shape_vec((num_chars, hidden_dim), char_embeddings)
-                    .map_err(|e| anyhow!("Failed to reshape BERT embeddings: {}", e))
-            } else {
-                let num_chars = seq_len.saturating_sub(2).max(1);
-                Ok(Array2::zeros((num_chars, 1024)))
-            }
-        } else {
-            let num_chars = input_ids.len().saturating_sub(2).max(1);
-            Ok(Array2::zeros((num_chars, 1024)))
+        let (shape, data) = outputs[0].try_extract_tensor::<f32>()?;
+        let shape_slice = shape.as_ref();
+        if shape_slice.len() != 3 || shape_slice[0] != 1 || shape_slice[1] < 2 {
+            return Err(anyhow!(
+                "RoBERTa returned an unexpected tensor shape: {:?}",
+                shape_slice
+            ));
         }
+
+        let seq_dim = shape_slice[1] as usize;
+        let hidden_dim = shape_slice[2] as usize;
+        let num_chars = seq_dim - 2; // exclude [CLS] and [SEP]
+        let mut char_embeddings = Vec::with_capacity(num_chars * hidden_dim);
+
+        // Slice data[1..-1] to remove the tokenizer's special tokens.
+        for char_idx in 1..seq_dim - 1 {
+            let start = char_idx * hidden_dim;
+            let end = start + hidden_dim;
+            char_embeddings.extend_from_slice(&data[start..end]);
+        }
+
+        Array2::from_shape_vec((num_chars, hidden_dim), char_embeddings)
+            .map_err(|e| anyhow!("Failed to reshape BERT embeddings: {}", e))
     }
 }
