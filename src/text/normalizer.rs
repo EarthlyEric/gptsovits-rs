@@ -1,5 +1,5 @@
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 use std::collections::HashMap;
 
 lazy_static! {
@@ -22,7 +22,6 @@ lazy_static! {
         m.insert("～", "…");
         m
     };
-
     static ref CONSECUTIVE_PUNCT: Regex = Regex::new(r"([!?,.…\-])([!?,.…\-])+").unwrap();
     static ref DIGITS_RE: Regex = Regex::new(r"\d+").unwrap();
 }
@@ -97,24 +96,26 @@ pub fn number_to_chinese(num: i64) -> String {
 
 /// Convert all digit sequences in text to Chinese numerals
 pub fn normalize_numbers(text: &str) -> String {
-    DIGITS_RE.replace_all(text, |caps: &regex::Captures| {
-        if let Ok(num) = caps[0].parse::<i64>() {
-            number_to_chinese(num)
-        } else {
-            // If overflow or too large, read digit by digit
-            let digits_map = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
-            caps[0]
-                .chars()
-                .map(|c| {
-                    if let Some(d) = c.to_digit(10) {
-                        digits_map[d as usize]
-                    } else {
-                        ""
-                    }
-                })
-                .collect::<String>()
-        }
-    }).to_string()
+    DIGITS_RE
+        .replace_all(text, |caps: &regex::Captures| {
+            if let Ok(num) = caps[0].parse::<i64>() {
+                number_to_chinese(num)
+            } else {
+                // If overflow or too large, read digit by digit
+                let digits_map = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九"];
+                caps[0]
+                    .chars()
+                    .map(|c| {
+                        if let Some(d) = c.to_digit(10) {
+                            digits_map[d as usize]
+                        } else {
+                            ""
+                        }
+                    })
+                    .collect::<String>()
+            }
+        })
+        .to_string()
 }
 
 /// Replace punctuation marks with standard TTS punctuation symbols
@@ -147,7 +148,19 @@ pub fn normalize_chinese_text(text: &str) -> String {
     let text = normalize_numbers(text);
     let text = replace_punctuation(&text);
     let text = replace_consecutive_punctuation(&text);
-    text.trim().to_string()
+    // Match GPT-SoVITS chinese2.replace_punctuation: quote marks and other
+    // unsupported symbols are removed instead of being turned into phones.
+    text.chars()
+        .filter(|ch| {
+            ch.is_ascii_alphabetic()
+                || ch.is_ascii_digit()
+                || ch.is_whitespace()
+                || ('\u{4e00}'..='\u{9fa5}').contains(ch)
+                || matches!(ch, '!' | '?' | '…' | ',' | '.' | '-')
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 #[cfg(test)]
@@ -166,6 +179,9 @@ mod tests {
     #[test]
     fn test_replace_consecutive_punctuation() {
         assert_eq!(replace_consecutive_punctuation("你好！！！"), "你好!");
-        assert_eq!(replace_consecutive_punctuation("真的嗎？？？..."), "真的嗎?");
+        assert_eq!(
+            replace_consecutive_punctuation("真的嗎？？？..."),
+            "真的嗎?"
+        );
     }
 }

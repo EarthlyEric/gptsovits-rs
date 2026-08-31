@@ -10,7 +10,6 @@ lazy_static! {
         s.insert(',');
         s.insert('.');
         s.insert('-');
-        s.insert(' ');
         s.insert('，');
         s.insert('。');
         s.insert('？');
@@ -32,7 +31,9 @@ fn is_pure_punctuation(text: &str) -> bool {
     if trimmed.is_empty() {
         return true;
     }
-    trimmed.chars().all(|c| PUNCTUATION_SET.contains(&c))
+    trimmed
+        .chars()
+        .all(|c| c.is_whitespace() || PUNCTUATION_SET.contains(&c))
 }
 
 /// Helper to split text by punctuation boundaries into small clauses while retaining delimiter
@@ -170,7 +171,9 @@ pub fn cut2(inp: &str) -> Vec<String> {
         }
     }
 
-    opts.into_iter().filter(|s| !is_pure_punctuation(s)).collect()
+    opts.into_iter()
+        .filter(|s| !is_pure_punctuation(s))
+        .collect()
 }
 
 /// cut3: Split on Chinese period `。`

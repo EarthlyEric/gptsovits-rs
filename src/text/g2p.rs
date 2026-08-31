@@ -16,8 +16,8 @@ lazy_static! {
         s.insert('-');
         s
     };
-
-    static ref WORD_SPLIT_RE: Regex = Regex::new(r"[\u4e00-\u9fa5]|[a-zA-Z]+|[!?,.…\-]|\s+").unwrap();
+    static ref WORD_SPLIT_RE: Regex =
+        Regex::new(r"[\u4e00-\u9fa5]|[a-zA-Z]+|[!?,.…\-]|\s+").unwrap();
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,11 @@ pub fn apply_tone_sandhi(chars: &[char], pinyins: &mut [String]) {
         if ch == '一' {
             if i + 1 < n {
                 let next_py = &pinyins[i + 1];
-                let next_tone = next_py.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(5);
+                let next_tone = next_py
+                    .chars()
+                    .last()
+                    .and_then(|c| c.to_digit(10))
+                    .unwrap_or(5);
                 if next_tone == 4 {
                     pinyins[i] = format!("{}2", base_py);
                 } else if next_tone == 1 || next_tone == 2 || next_tone == 3 {
@@ -65,7 +69,11 @@ pub fn apply_tone_sandhi(chars: &[char], pinyins: &mut [String]) {
         else if ch == '不' {
             if i + 1 < n {
                 let next_py = &pinyins[i + 1];
-                let next_tone = next_py.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(5);
+                let next_tone = next_py
+                    .chars()
+                    .last()
+                    .and_then(|c| c.to_digit(10))
+                    .unwrap_or(5);
                 if next_tone == 4 {
                     pinyins[i] = format!("{}2", base_py);
                 }
@@ -74,7 +82,11 @@ pub fn apply_tone_sandhi(chars: &[char], pinyins: &mut [String]) {
         // Rule for 3rd tone + 3rd tone -> 2nd tone + 3rd tone
         else if tone == 3 && i + 1 < n {
             let next_py = &pinyins[i + 1];
-            let next_tone = next_py.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(5);
+            let next_tone = next_py
+                .chars()
+                .last()
+                .and_then(|c| c.to_digit(10))
+                .unwrap_or(5);
             if next_tone == 3 {
                 pinyins[i] = format!("{}2", base_py);
             }
@@ -88,7 +100,11 @@ pub fn pinyin_to_opencpop(pinyin_with_tone: &str) -> Option<(String, String)> {
         return None;
     }
 
-    let tone = pinyin_with_tone.chars().last().and_then(|c| c.to_digit(10)).unwrap_or(5);
+    let tone = pinyin_with_tone
+        .chars()
+        .last()
+        .and_then(|c| c.to_digit(10))
+        .unwrap_or(5);
     let base = if pinyin_with_tone.ends_with(|c: char| c.is_ascii_digit()) {
         &pinyin_with_tone[..pinyin_with_tone.len() - 1]
     } else {
@@ -189,13 +205,10 @@ pub fn text_to_phonemes(
                 }
             }
         } else {
-            // Other symbol / whitespace / skip
-            if ch.is_whitespace() {
-                // Ignore whitespace in word2ph or add short pause if between words
-            } else {
-                phones.push(",".to_string());
-                word2ph.push(1);
-            }
+            // Unsupported symbols are removed by the upstream normalizer. Keep
+            // this branch non-phonetic as a final guard instead of inventing a
+            // comma phone that changes the prompt alignment.
+            word2ph.push(0);
             i += 1;
         }
     }
