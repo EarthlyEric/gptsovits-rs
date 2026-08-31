@@ -47,9 +47,24 @@ pub fn encode_audio(samples: &[f32], sample_rate: u32, format: AudioFormat) -> R
     match format {
         AudioFormat::Pcm => encode_pcm_s16le(&normalized),
         AudioFormat::Wav => encode_wav(&normalized, sample_rate),
-        AudioFormat::Mp3 => encode_ffmpeg(&normalized, sample_rate, "mp3", &["-c:a", "libmp3lame", "-q:a", "2"]),
-        AudioFormat::Opus => encode_ffmpeg(&normalized, sample_rate, "opus", &["-c:a", "libopus", "-b:a", "128k"]),
-        AudioFormat::Aac => encode_ffmpeg(&normalized, sample_rate, "adts", &["-c:a", "aac", "-b:a", "192k"]),
+        AudioFormat::Mp3 => encode_ffmpeg(
+            &normalized,
+            sample_rate,
+            "mp3",
+            &["-c:a", "libmp3lame", "-q:a", "2"],
+        ),
+        AudioFormat::Opus => encode_ffmpeg(
+            &normalized,
+            sample_rate,
+            "opus",
+            &["-c:a", "libopus", "-b:a", "128k"],
+        ),
+        AudioFormat::Aac => encode_ffmpeg(
+            &normalized,
+            sample_rate,
+            "adts",
+            &["-c:a", "aac", "-b:a", "192k"],
+        ),
         AudioFormat::Flac => encode_ffmpeg(&normalized, sample_rate, "flac", &["-c:a", "flac"]),
     }
 }
@@ -82,10 +97,12 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
         for &s in samples {
             let clamped = s.clamp(-1.0, 1.0);
             let sample_i16 = (clamped * 32767.0) as i16;
-            writer.write_sample(sample_i16)
+            writer
+                .write_sample(sample_i16)
                 .map_err(|e| anyhow!("Failed to write WAV sample: {}", e))?;
         }
-        writer.finalize()
+        writer
+            .finalize()
             .map_err(|e| anyhow!("Failed to finalize WAV: {}", e))?;
     }
 
@@ -93,24 +110,31 @@ pub fn encode_wav(samples: &[f32], sample_rate: u32) -> Result<Vec<u8>> {
 }
 
 /// Encode using system ffmpeg for MP3, AAC, OPUS, FLAC
-fn encode_ffmpeg(samples: &[f32], sample_rate: u32, out_format: &str, extra_args: &[&str]) -> Result<Vec<u8>> {
+fn encode_ffmpeg(
+    samples: &[f32],
+    sample_rate: u32,
+    out_format: &str,
+    extra_args: &[&str],
+) -> Result<Vec<u8>> {
     let mut cmd = Command::new("ffmpeg");
     cmd.args([
-        "-f", "s16le",
-        "-ar", &sample_rate.to_string(),
-        "-ac", "1",
-        "-i", "pipe:0",
+        "-f",
+        "s16le",
+        "-ar",
+        &sample_rate.to_string(),
+        "-ac",
+        "1",
+        "-i",
+        "pipe:0",
     ]);
     cmd.args(extra_args);
-    cmd.args([
-        "-f", out_format,
-        "pipe:1",
-    ]);
+    cmd.args(["-f", out_format, "pipe:1"]);
     cmd.stdin(Stdio::piped())
-       .stdout(Stdio::piped())
-       .stderr(Stdio::null());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
 
-    let mut child = cmd.spawn()
+    let mut child = cmd
+        .spawn()
         .map_err(|e| anyhow!("Failed to spawn ffmpeg for audio encoding: {}", e))?;
 
     let pcm_bytes = encode_pcm_s16le(samples)?;
@@ -119,7 +143,8 @@ fn encode_ffmpeg(samples: &[f32], sample_rate: u32, out_format: &str, extra_args
         stdin.write_all(&pcm_bytes)?;
     }
 
-    let output = child.wait_with_output()
+    let output = child
+        .wait_with_output()
         .map_err(|e| anyhow!("ffmpeg encoding error: {}", e))?;
 
     if !output.status.success() {
