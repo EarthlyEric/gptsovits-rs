@@ -59,10 +59,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # Make CUDA/cuDNN and custom ONNX Runtime provider libraries discoverable
-ENV CUDA_HOME=/usr/local/cuda \
-    ORT_CUDA_LIB_DIR=/usr/local/cuda/lib64 \
-    ORT_CUDNN_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-    LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/bin
+ENV RUST_LOG="info,gptsovits_rs=info,tower_http=info,axum=info" \
+    NVIDIA_VISIBLE_DEVICES="all" \
+    NVIDIA_DRIVER_CAPABILITIES="compute,utility" \
+    CUDA_HOME="/usr/local/cuda" \
+    ORT_CUDA_LIB_DIR="/usr/local/cuda/lib64" \
+    ORT_CUDNN_LIB_DIR="/usr/lib/x86_64-linux-gnu" \
+    ORT_DYLIB_PATH="/usr/local/lib/libonnxruntime.so" \
+    LD_LIBRARY_PATH="/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/bin"
 
 # Create persistent mount directories
 RUN mkdir -p /app/models /app/voices
@@ -72,6 +76,9 @@ COPY --from=builder /usr/src/gptsovits-rs/target/release/gptsovits-rs /usr/local
 
 # Copy ONNX runtime dynamic libraries if produced during build
 COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime* /usr/local/lib/
+
+# Copy custom ONNX runtime libraries if provided in build context (e.g. from GitHub Actions CI)
+COPY ort_libs* /usr/local/lib/
 
 # Copy default configurations
 COPY config.toml /app/config.toml
