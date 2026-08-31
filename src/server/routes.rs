@@ -79,7 +79,19 @@ pub async fn create_speech(
     let response_format = payload.response_format.unwrap_or(AudioFormat::Mp3);
     let stream_format = payload.stream_format.unwrap_or(StreamFormat::Audio);
 
-    // 3. Resolve Voice Preset / Dynamic Voice Object
+    // 3. Reject unknown models before reading a reference file.
+    if !state.model_manager.has_model(&payload.model) {
+        return Err(AppError::NotFound(
+            format!(
+                "Model '{}' not found in base models or custom models",
+                payload.model
+            ),
+            Some("model"),
+            Some("model_not_found"),
+        ));
+    }
+
+    // 4. Resolve Voice Preset / Dynamic Voice Object
     let voice_preset = state
         .voice_manager
         .resolve_voice(&payload.voice)
@@ -91,18 +103,26 @@ pub async fn create_speech(
             )
         })?;
 
-    // 4. Load Reference Audio if specified
-    let (ref_audio, ref_sr) = if !voice_preset.ref_audio_path.is_empty() {
-        if let Ok((samples, sr)) = load_wav(&voice_preset.ref_audio_path) {
-            (samples, sr)
-        } else {
-            (Vec::new(), 32000)
-        }
-    } else {
-        (Vec::new(), 32000)
-    };
+    // 5. A reference recording is required by GPT-SoVITS zero-shot inference.
+    if voice_preset.ref_audio_path.trim().is_empty() {
+        return Err(AppError::BadRequest(
+            "Voice reference audio path cannot be empty.".to_string(),
+            Some("voice"),
+            Some("missing_reference_audio"),
+        ));
+    }
+    let (ref_audio, ref_sr) = load_wav(&voice_preset.ref_audio_path).map_err(|error| {
+        AppError::BadRequest(
+            format!(
+                "Failed to load voice reference audio '{}': {}",
+                voice_preset.ref_audio_path, error
+            ),
+            Some("voice"),
+            Some("invalid_reference_audio"),
+        )
+    })?;
 
-    // 5. Build Inference Request
+    // 6. Build Inference Request
     let infer_req = InferenceRequest {
         text: payload.input,
         text_lang: voice_preset.text_lang.clone(),
@@ -120,31 +140,29 @@ pub async fn create_speech(
         sample_steps: 32,
     };
 
-    // 6. Acquire concurrency permit
-    let _permit = state
-        .semaphore
-        .try_acquire()
-        .map_err(|_| AppError::RateLimit("Server concurrency limit reached. Please retry shortly.".to_string()))?;
+    // 7. Acquire concurrency permit
+    let _permit = state.semaphore.try_acquire().map_err(|_| {
+        AppError::RateLimit("Server concurrency limit reached. Please retry shortly.".to_string())
+    })?;
 
-    // 7. Run Inference with selected model (custom fine-tuned model or base model)
+    // 8. Run Inference with selected model (custom fine-tuned model or base model)
     let model_mgr = state.model_manager.clone();
     let model_name = payload.model.clone();
 
-    let infer_result = tokio::task::spawn_blocking(move || {
-        model_mgr.synthesize_by_model(&infer_req, &model_name)
-    })
-    .await
-    .map_err(|e| AppError::Internal(format!("Task execution failed: {}", e)))?
-    .map_err(|e| {
-        let err_str = e.to_string();
-        if err_str.contains("not found") {
-            AppError::NotFound(err_str, Some("model"), Some("model_not_found"))
-        } else {
-            AppError::Internal(format!("TTS synthesis error: {}", err_str))
-        }
-    })?;
+    let infer_result =
+        tokio::task::spawn_blocking(move || model_mgr.synthesize_by_model(&infer_req, &model_name))
+            .await
+            .map_err(|e| AppError::Internal(format!("Task execution failed: {}", e)))?
+            .map_err(|e| {
+                let err_str = e.to_string();
+                if err_str.contains("not found") {
+                    AppError::NotFound(err_str, Some("model"), Some("model_not_found"))
+                } else {
+                    AppError::Internal(format!("TTS synthesis error: {}", err_str))
+                }
+            })?;
 
-    // 8. Audio Encoding
+    // 9. Audio Encoding
     let audio_bytes = encode_audio(
         &infer_result.samples,
         infer_result.sample_rate,
@@ -152,7 +170,7 @@ pub async fn create_speech(
     )
     .map_err(|e| AppError::Internal(format!("Audio encoding failed: {}", e)))?;
 
-    // 9. Return response based on stream_format
+    // 10. Return response based on stream_format
     match stream_format {
         StreamFormat::Audio => {
             let mut headers = HeaderMap::new();
@@ -178,14 +196,8 @@ pub async fn create_speech(
                 header::CONTENT_TYPE,
                 HeaderValue::from_static("text/event-stream"),
             );
-            headers.insert(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("no-cache"),
-            );
-            headers.insert(
-                header::CONNECTION,
-                HeaderValue::from_static("keep-alive"),
-            );
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+            headers.insert(header::CONNECTION, HeaderValue::from_static("keep-alive"));
 
             let chunk_size = 8192;
             let chunks: Vec<Result<bytes::Bytes, std::io::Error>> = audio_bytes

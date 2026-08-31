@@ -12,13 +12,17 @@ use gptsovits_rs::voice::VoiceManager;
 fn setup_test_app() -> axum::Router {
     let mut config = AppConfig::default();
     config.server.api_key = "test-secret-token".to_string();
+    config.models.cnhubert_path = "test-assets/missing/cnhubert.onnx".to_string();
+    config.models.bert_path = "test-assets/missing/bert.onnx".to_string();
+    config.models.bert_tokenizer_path = "test-assets/missing/tokenizer.json".to_string();
+    config.models.speaker_path = "test-assets/missing/sv.onnx".to_string();
 
     // Register a custom fine-tuned model
     config.models.custom.insert(
         "sandrone".to_string(),
         CustomModelConfig {
             model_version: "v2ProPlus".to_string(),
-            model_dir: "models/sandrone".to_string(),
+            model_dir: "test-assets/missing/sandrone".to_string(),
             sampling_rate: Some(32000),
             sample_steps: Some(32),
             ..Default::default()
@@ -82,6 +86,7 @@ async fn test_auth_failure_returns_401_openai_format() {
 }
 
 #[tokio::test]
+#[ignore = "requires external ONNX model assets"]
 async fn test_create_speech_success_all_base_versions() {
     let versions = [
         ("gpt-sovits-v1", ModelVersion::V1),
@@ -120,7 +125,10 @@ async fn test_create_speech_success_all_base_versions() {
         let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
         if status != StatusCode::OK {
             let body_str = String::from_utf8_lossy(&body);
-            panic!("Failed for model {}: status={}, error={}", model_name, status, body_str);
+            panic!(
+                "Failed for model {}: status={}, error={}",
+                model_name, status, body_str
+            );
         }
         assert_eq!(status, StatusCode::OK);
         assert!(!body.is_empty());
@@ -129,6 +137,7 @@ async fn test_create_speech_success_all_base_versions() {
 }
 
 #[tokio::test]
+#[ignore = "requires external ONNX model assets"]
 async fn test_create_speech_with_custom_model_specified() {
     let app = setup_test_app();
 
@@ -158,7 +167,10 @@ async fn test_create_speech_with_custom_model_specified() {
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     if status != StatusCode::OK {
         let body_str = String::from_utf8_lossy(&body);
-        panic!("Failed for custom model sandrone: status={}, error={}", status, body_str);
+        panic!(
+            "Failed for custom model sandrone: status={}, error={}",
+            status, body_str
+        );
     }
     assert_eq!(status, StatusCode::OK);
     assert!(!body.is_empty());
@@ -195,6 +207,41 @@ async fn test_unknown_model_returns_404() {
 }
 
 #[tokio::test]
+async fn test_dynamic_voice_without_reference_returns_400() {
+    let app = setup_test_app();
+
+    let req_body = json!({
+        "model": "gpt-sovits-v2",
+        "input": "測試缺少參考音訊",
+        "voice": {
+            "ref_audio_path": "",
+            "prompt_text": "提示文本",
+            "prompt_lang": "zh",
+            "text_lang": "zh"
+        }
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/audio/speech")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::AUTHORIZATION, "Bearer test-secret-token")
+                .body(Body::from(req_body.to_string()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json_val: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json_val["error"]["code"], "missing_reference_audio");
+}
+
+#[tokio::test]
+#[ignore = "requires external ONNX model assets"]
 async fn test_create_speech_with_dynamic_voice_object() {
     let app = setup_test_app();
 
@@ -237,6 +284,7 @@ async fn test_create_speech_with_dynamic_voice_object() {
 }
 
 #[tokio::test]
+#[ignore = "requires external ONNX model assets"]
 async fn test_create_speech_with_segmented_text_methods() {
     let app = setup_test_app();
 
@@ -377,13 +425,17 @@ async fn test_models_and_voices_listing_with_custom_models() {
     let json_val: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     let models_data = json_val["data"].as_array().unwrap();
-    
+
     // Check official base models
-    let has_base = models_data.iter().any(|m| m["id"] == "gpt-sovits-v2" && m["owned_by"] == "official-base");
+    let has_base = models_data
+        .iter()
+        .any(|m| m["id"] == "gpt-sovits-v2" && m["owned_by"] == "official-base");
     assert!(has_base);
 
     // Check custom fine-tuned model
-    let has_custom = models_data.iter().any(|m| m["id"] == "sandrone" && m["owned_by"] == "custom-finetuned");
+    let has_custom = models_data
+        .iter()
+        .any(|m| m["id"] == "sandrone" && m["owned_by"] == "custom-finetuned");
     assert!(has_custom);
 
     // Voices listing
@@ -433,19 +485,18 @@ async fn test_openapi_spec_and_docs_endpoints() {
     // 2. GET /docs (Scalar Interactive Documentation)
     let res_docs = app
         .clone()
-        .oneshot(
-            Request::builder()
-                .uri("/docs")
-                .body(Body::empty())
-                .unwrap(),
-        )
+        .oneshot(Request::builder().uri("/docs").body(Body::empty()).unwrap())
         .await
         .unwrap();
 
     assert_eq!(res_docs.status(), StatusCode::OK);
     let body_docs = to_bytes(res_docs.into_body(), usize::MAX).await.unwrap();
     let docs_str = String::from_utf8(body_docs.to_vec()).unwrap();
-    assert!(docs_str.to_lowercase().contains("scalar") || docs_str.contains("api-reference") || docs_str.contains("<html"));
+    assert!(
+        docs_str.to_lowercase().contains("scalar")
+            || docs_str.contains("api-reference")
+            || docs_str.contains("<html")
+    );
 
     // 3. GET /swagger-ui/ (Swagger UI Interactive Documentation)
     let res_swagger = app
