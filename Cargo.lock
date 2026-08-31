@@ -613,6 +613,7 @@ dependencies = [
  "rand",
  "regex",
  "rubato",
+ "rustfft",
  "serde",
  "serde_json",
  "tempfile",
