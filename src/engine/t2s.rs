@@ -16,19 +16,34 @@ pub struct T2SModel {
 fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
+        tracing::warn!(path = %path_ref.display(), "T2S ONNX model file not found");
         return None;
     }
-    let builder = Session::builder().map_err(|e| anyhow!("{}", e)).ok()?;
-    let mut builder = builder.with_intra_threads(threads).map_err(|e| anyhow!("{}", e)).ok()?;
-    builder.commit_from_file(path_ref).map_err(|e| anyhow!("{}", e)).ok()
+    let builder = match Session::builder() {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to create T2S ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_intra_threads(threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure T2S ONNX session");
+            return None;
+        }
+    };
+    match builder.commit_from_file(path_ref) {
+        Ok(session) => Some(session),
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to load T2S ONNX model");
+            None
+        }
+    }
 }
 
 impl T2SModel {
-    pub fn new<P: AsRef<Path>>(
-        encoder_path: P,
-        fsdec_path: P,
-        sdec_path: P,
-    ) -> Self {
+    pub fn new<P: AsRef<Path>>(encoder_path: P, fsdec_path: P, sdec_path: P) -> Self {
         let encoder_session = load_session(encoder_path, 4);
         let fsdec_session = load_session(fsdec_path, 4);
         let sdec_session = load_session(sdec_path, 4);
@@ -87,7 +102,10 @@ impl T2SModel {
             let sx = shape_x.as_ref();
             let sp = shape_p.as_ref();
 
-            let x_arr = Array3::from_shape_vec((sx[0] as usize, sx[1] as usize, sx[2] as usize), data_x.to_vec())?;
+            let x_arr = Array3::from_shape_vec(
+                (sx[0] as usize, sx[1] as usize, sx[2] as usize),
+                data_x.to_vec(),
+            )?;
             let p_arr = Array2::from_shape_vec((sp[0] as usize, sp[1] as usize), data_p.to_vec())?;
 
             let x_val = Value::from_array(x_arr)?;
@@ -112,19 +130,44 @@ impl T2SModel {
             let sex = s_ex.as_ref();
 
             let mut y_arr = Array2::from_shape_vec((sy[0] as usize, sy[1] as usize), d_y.to_vec())?;
-            let mut k_arr = Array4::from_shape_vec((sk[0] as usize, sk[1] as usize, sk[2] as usize, sk[3] as usize), d_k.to_vec())?;
-            let mut v_arr = Array4::from_shape_vec((sv[0] as usize, sv[1] as usize, sv[2] as usize, sv[3] as usize), d_v.to_vec())?;
-            let mut y_emb_arr = Array3::from_shape_vec((semb[0] as usize, semb[1] as usize, semb[2] as usize), d_emb.to_vec())?;
-            
+            let mut k_arr = Array4::from_shape_vec(
+                (
+                    sk[0] as usize,
+                    sk[1] as usize,
+                    sk[2] as usize,
+                    sk[3] as usize,
+                ),
+                d_k.to_vec(),
+            )?;
+            let mut v_arr = Array4::from_shape_vec(
+                (
+                    sv[0] as usize,
+                    sv[1] as usize,
+                    sv[2] as usize,
+                    sv[3] as usize,
+                ),
+                d_v.to_vec(),
+            )?;
+            let mut y_emb_arr = Array3::from_shape_vec(
+                (semb[0] as usize, semb[1] as usize, semb[2] as usize),
+                d_emb.to_vec(),
+            )?;
+
             let sex_dims: Vec<usize> = sex.iter().map(|&dim| dim as usize).collect();
-            let x_example_arr = ndarray::ArrayD::from_shape_vec(ndarray::IxDyn(&sex_dims), d_ex.to_vec())?;
+            let x_example_arr =
+                ndarray::ArrayD::from_shape_vec(ndarray::IxDyn(&sex_dims), d_ex.to_vec())?;
 
             let mut generated_tokens = Vec::new();
-            let mut history_tokens = Vec::new();
+            // The first-stage decoder has already appended one warm-up token. The
+            // decoder cache does not contain the next sampled token yet, so each
+            // externally sampled token can safely replace y's last element before
+            // the following step.
+            let mut history_tokens = d_y.to_vec();
 
             // 3. Autoregressive generation loop
             const MAX_STEPS: usize = 1500;
             const EOS_TOKEN: i64 = 1024;
+            const MIN_GENERATED_TOKENS: usize = 10;
 
             for _ in 0..MAX_STEPS {
                 let iy_val = Value::from_array(y_arr.clone())?;
@@ -153,18 +196,56 @@ impl T2SModel {
                 let semb = s_emb.as_ref();
 
                 y_arr = Array2::from_shape_vec((sy[0] as usize, sy[1] as usize), d_y.to_vec())?;
-                k_arr = Array4::from_shape_vec((sk[0] as usize, sk[1] as usize, sk[2] as usize, sk[3] as usize), d_k.to_vec())?;
-                v_arr = Array4::from_shape_vec((sv[0] as usize, sv[1] as usize, sv[2] as usize, sv[3] as usize), d_v.to_vec())?;
-                y_emb_arr = Array3::from_shape_vec((semb[0] as usize, semb[1] as usize, semb[2] as usize), d_emb.to_vec())?;
+                k_arr = Array4::from_shape_vec(
+                    (
+                        sk[0] as usize,
+                        sk[1] as usize,
+                        sk[2] as usize,
+                        sk[3] as usize,
+                    ),
+                    d_k.to_vec(),
+                )?;
+                v_arr = Array4::from_shape_vec(
+                    (
+                        sv[0] as usize,
+                        sv[1] as usize,
+                        sv[2] as usize,
+                        sv[3] as usize,
+                    ),
+                    d_v.to_vec(),
+                )?;
+                y_emb_arr = Array3::from_shape_vec(
+                    (semb[0] as usize, semb[1] as usize, semb[2] as usize),
+                    d_emb.to_vec(),
+                )?;
 
                 let current_logits = if d_logits.len() >= 1025 {
                     &d_logits[d_logits.len() - 1025..]
                 } else {
-                    d_logits
+                    return Err(anyhow!(
+                        "T2S decoder returned {} logits; expected at least 1025",
+                        d_logits.len()
+                    ));
                 };
 
+                let mut sampling_logits = current_logits.to_vec();
+                if generated_tokens.len() < MIN_GENERATED_TOKENS {
+                    sampling_logits[EOS_TOKEN as usize] = f32::NEG_INFINITY;
+                }
+
+                let greedy_token = current_logits
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, score)| score.is_finite())
+                    .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(index, _)| index as i64);
+                if generated_tokens.len() >= MIN_GENERATED_TOKENS && greedy_token == Some(EOS_TOKEN)
+                {
+                    break;
+                }
+
                 let next_token = sample_next_token(
-                    current_logits,
+                    &sampling_logits,
                     &history_tokens,
                     temperature,
                     top_k,
@@ -178,25 +259,27 @@ impl T2SModel {
 
                 let safe_token = next_token.clamp(0, 1023);
                 generated_tokens.push(safe_token);
-                history_tokens.push(next_token);
+                history_tokens.push(safe_token);
+
+                // sdec internally appends its own sample to y, but that sample
+                // has not been consumed by k/v/y_emb yet. Replace it so the
+                // next invocation follows the token sequence sent to VITS.
+                let y_slice = y_arr
+                    .as_slice_mut()
+                    .ok_or_else(|| anyhow!("T2S decoder returned a non-contiguous y tensor"))?;
+                let last = y_slice
+                    .last_mut()
+                    .ok_or_else(|| anyhow!("T2S decoder returned an empty y tensor"))?;
+                *last = safe_token;
             }
 
             if generated_tokens.is_empty() {
-                let num_semantic = (text_seq.len() * 2).clamp(10, 200);
-                for i in 0..num_semantic {
-                    generated_tokens.push((i % 1024) as i64);
-                }
+                return Err(anyhow!("T2S decoder generated no semantic tokens"));
             }
 
             Ok(generated_tokens)
         } else {
-            // Mock semantic token sequence proportional to text length
-            let num_semantic = (text_seq.len() * 2).clamp(10, 200);
-            let mut mock_tokens = Vec::with_capacity(num_semantic);
-            for i in 0..num_semantic {
-                mock_tokens.push((i % 1024) as i64);
-            }
-            Ok(mock_tokens)
+            Err(anyhow!("T2S model is not fully loaded"))
         }
     }
 }
