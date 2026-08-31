@@ -74,6 +74,7 @@ jobs:
     name: Build ONNX Runtime (CUDA 12.8 + sm_120/sm_89/sm_86/sm_80/sm_75)
     needs: test
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     container:
       image: nvidia/cuda:12.8.0-cudnn-devel-ubuntu24.04
     steps:
