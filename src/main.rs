@@ -31,6 +31,11 @@ fn cuda_library_roots(runtime: &RuntimeConfig) -> Vec<PathBuf> {
     for base in [
         std::env::var_os("CUDA_HOME").map(PathBuf::from),
         std::env::var_os("CUDA_PATH").map(PathBuf::from),
+        Some(PathBuf::from("/opt/cuda")),
+        Some(PathBuf::from("/usr/local/cuda")),
+        Some(PathBuf::from("/usr/local/cuda-12.8")),
+        Some(PathBuf::from("/usr/local/cuda-12")),
+        Some(PathBuf::from("/usr/local/cuda-13")),
     ]
     .into_iter()
     .flatten()
@@ -67,32 +72,53 @@ fn preload_library(name: &str, roots: &[PathBuf]) -> anyhow::Result<()> {
 }
 
 fn preload_cuda_dependencies(runtime: &RuntimeConfig) -> anyhow::Result<()> {
-    // ort's CUDA 13 distribution keeps these dependencies outside the provider .so.
-    const REQUIRED_LIBRARIES: &[&str] = &[
-        "libcudart.so.13",
-        "libcublasLt.so.13",
-        "libcublas.so.13",
-        "libcurand.so.10",
+    // Support both CUDA 12 (e.g. 12.8 with Blackwell sm_120) and CUDA 13 sonames.
+    const REQUIRED_LIB_GROUPS: &[(&str, &[&str])] = &[
+        (
+            "libcudart",
+            &["libcudart.so.12", "libcudart.so.13", "libcudart.so"],
+        ),
+        (
+            "libcublasLt",
+            &["libcublasLt.so.12", "libcublasLt.so.13", "libcublasLt.so"],
+        ),
+        (
+            "libcublas",
+            &["libcublas.so.12", "libcublas.so.13", "libcublas.so"],
+        ),
+        (
+            "libcurand",
+            &["libcurand.so.10", "libcurand.so.12", "libcurand.so"],
+        ),
     ];
     let roots = cuda_library_roots(runtime);
     let mut missing = Vec::new();
 
-    for library in REQUIRED_LIBRARIES {
-        if let Err(error) = preload_library(library, &roots) {
-            tracing::debug!(library, %error, "CUDA dependency was not found");
-            missing.push(*library);
+    for (lib_group, candidates) in REQUIRED_LIB_GROUPS {
+        let mut loaded = false;
+        for candidate in *candidates {
+            if preload_library(candidate, &roots).is_ok() {
+                loaded = true;
+                break;
+            }
+        }
+        if !loaded {
+            tracing::debug!(lib_group, "CUDA dependency group was not found");
+            missing.push(*lib_group);
         }
     }
 
     if !missing.is_empty() {
         anyhow::bail!(
-            "CUDAExecutionProvider dependencies are missing: {}. Set runtime.cuda_lib_dir or ORT_CUDA_LIB_DIR to the CUDA 13 library directory",
+            "CUDAExecutionProvider dependencies are missing: {}. Set runtime.cuda_lib_dir or ORT_CUDA_LIB_DIR to your CUDA 12/13 library directory",
             missing.join(", ")
         );
     }
 
-    if let Err(error) = preload_library("libcudnn.so.9", &roots) {
-        tracing::debug!(%error, "cuDNN library was not preloaded; ONNX Runtime may not require it");
+    for cudnn_candidate in &["libcudnn.so.9", "libcudnn.so.8", "libcudnn.so"] {
+        if preload_library(cudnn_candidate, &roots).is_ok() {
+            break;
+        }
     }
     Ok(())
 }

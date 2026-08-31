@@ -33,11 +33,11 @@ COPY assets ./assets
 RUN cargo build --release
 
 # ==============================================================================
-# Stage 2: CUDA 13 + cuDNN runtime image
+# Stage 2: CUDA 12.8 + cuDNN 9 runtime image
 # ==============================================================================
-# ort's CUDA-enabled prebuilt distribution currently targets CUDA 13. Keep the
-# runtime image on the same major CUDA version as the provider binary.
-FROM nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 AS runtime
+# CUDA 12.8 provides native hardware support for RTX 50 series (Blackwell sm_120)
+# as well as RTX 40 (sm_89), RTX 30 (sm_80/86), and RTX 20 (sm_75).
+FROM nvidia/cuda:12.8.0-cudnn-runtime-ubuntu24.04 AS runtime
 
 LABEL org.opencontainers.image.title="gptsovits-rs"
 LABEL org.opencontainers.image.description="Pure Rust Inference Engine & OpenAI-compatible TTS Server for GPT-SoVITS"
@@ -58,12 +58,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Make CUDA/cuDNN and the ONNX Runtime provider libraries discoverable by both
-# the dynamic linker and the explicit preload performed by the Rust binary.
+# Make CUDA/cuDNN and custom ONNX Runtime provider libraries discoverable
 ENV CUDA_HOME=/usr/local/cuda \
     ORT_CUDA_LIB_DIR=/usr/local/cuda/lib64 \
     ORT_CUDNN_LIB_DIR=/usr/lib/x86_64-linux-gnu \
-    LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/local/bin
+    LD_LIBRARY_PATH=/usr/local/lib:/usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/bin
 
 # Create persistent mount directories
 RUN mkdir -p /app/models /app/voices
@@ -71,9 +70,8 @@ RUN mkdir -p /app/models /app/voices
 # Copy binary from builder
 COPY --from=builder /usr/src/gptsovits-rs/target/release/gptsovits-rs /usr/local/bin/gptsovits-rs
 
-# copy-dylibs emits these provider libraries next to the release binary. They
-# are not part of the statically linked core ONNX Runtime library.
-COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime_providers_*.so /usr/local/bin/
+# Copy ONNX runtime dynamic libraries if produced during build
+COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime* /usr/local/lib/
 
 # Copy default configurations
 COPY config.toml /app/config.toml

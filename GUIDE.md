@@ -461,16 +461,18 @@ docker build -t gptsovits-rs:latest .
 
 ## 10. 常見問題與排錯指南 (Troubleshooting)
 
-### Q1: 啟動時提示 `libcublasLt.so.13: cannot open shared object file` 怎麼辦？
-* **原因**：本機發布的 `ort` 2.x CUDA 發行包鏈接至 CUDA 13 核心動態庫，而宿主機環境缺少 CUDA 13 函式庫（例如宿主機僅安裝 CUDA 12.x）。
+### Q1: 啟動時提示 `libcudart.so` / `libcublasLt.so` cannot open shared object file 怎麼辦？
+* **原因**：本機 ONNX Runtime CUDA 發行包鏈接至 CUDA 核心動態庫，而宿主機環境缺少對應的 CUDA 函式庫或未加入搜尋路徑。
 * **處置方案**：
-  1. **（推薦）使用 Docker Compose 部署**：執行 `docker compose up -d --build`，容器內建完整的 CUDA 13 + cuDNN 環境，開箱即用。
-  2. **手動指定路徑**：若有 CUDA 13 庫檔案，可在 `config.toml` 中配置 `[runtime] cuda_lib_dir = "/path/to/cuda13/lib"`。
+  1. **（推薦）使用 Docker Compose 部署**：執行 `docker compose up -d --build`，容器內建完整的 CUDA 12.8 / 13 + cuDNN 環境，開箱即用。
+  2. **手動指定路徑**：可在 `config.toml` 中配置 `[runtime] cuda_lib_dir = "/opt/cuda/targets/x86_64-linux/lib"` 或指定 `ORT_CUDA_LIB_DIR`。
   3. **切換為純 CPU 模式**：在 `config.toml` 中將 `[runtime] device = "cpu"` 即可於純 CPU 模式下順暢運行。
 
 ### Q2: 推論時出現 `CUDA error cudaErrorNoKernelImageForDevice: no kernel image is available`
-* **原因**：目前 ONNX Runtime 預編譯發行包內建之 CUDA kernel 支援至 `sm_75` (Turing)、`sm_80` (Ampere/A100)、`sm_90` (Hopper)。在最新的 RTX 5000 系列（Blackwell 架構，`sm_120`）若無對應 PTX，CUDA 會報無可用 Kernel。
-* **處置方案**：RTX 5000 系列顯卡請暫時於 `config.toml` 設定 `[runtime] device = "cpu"` 運行，或待 upstream ONNX Runtime 發布含 Blackwell PTX 之 CUDA 套件。RTX 20/30/40 系列與 A100/H100 可直接享受完整 CUDA 硬體加速。
+* **原因**：微軟官方預編譯的 ONNX Runtime 發行包內建之 CUDA kernel 僅支援至 `sm_75` (Turing/RTX 20)、`sm_80/86` (Ampere/RTX 30)、`sm_89/90` (Ada Lovelace/RTX 40/Hopper)。在最新的 RTX 5000 系列（Blackwell 架構，`sm_120`）若無對應 kernel，CUDA 會報無可用 Kernel。
+* **處置方案**：
+  1. **透過 GitHub Actions / Docker 自動構建**：本專案 CI 已整合包含 `sm_120` 支援的 CUDA 12.8 ONNX Runtime 自動構建與 Docker 映像檔發布。
+  2. **暫時切換為 CPU 模式**：在 `config.toml` 設定 `[runtime] device = "cpu"` 並調大 `intra_threads` 運行。
 
 ### Q2: 如何確認模型是否有真正使用 GPU 進行推論？
 啟動伺服器後發送合成請求，並在終端機執行：
