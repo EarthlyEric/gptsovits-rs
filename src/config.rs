@@ -177,6 +177,8 @@ pub struct ModelsConfig {
     pub bert_path: String,
     #[serde(default = "default_tokenizer_path")]
     pub bert_tokenizer_path: String,
+    #[serde(default = "default_speaker_path")]
+    pub speaker_path: String,
 
     #[serde(default)]
     pub v1: V1V2ModelConfig,
@@ -211,6 +213,10 @@ fn default_tokenizer_path() -> String {
     "models/chinese-roberta-wwm-ext-large/tokenizer.json".to_string()
 }
 
+fn default_speaker_path() -> String {
+    "models/sv.onnx".to_string()
+}
+
 impl Default for ModelsConfig {
     fn default() -> Self {
         Self {
@@ -218,6 +224,7 @@ impl Default for ModelsConfig {
             cnhubert_path: default_cnhubert_path(),
             bert_path: default_bert_path(),
             bert_tokenizer_path: default_tokenizer_path(),
+            speaker_path: default_speaker_path(),
             v1: V1V2ModelConfig::default(),
             v2: V1V2ModelConfig::default(),
             v2_pro: V1V2ModelConfig::default(),

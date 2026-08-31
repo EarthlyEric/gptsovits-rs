@@ -28,7 +28,9 @@ impl ModelVersion {
 
     pub fn sampling_rate(&self) -> u32 {
         match self {
-            ModelVersion::V1 | ModelVersion::V2 | ModelVersion::V2Pro | ModelVersion::V2ProPlus => 32000,
+            ModelVersion::V1 | ModelVersion::V2 | ModelVersion::V2Pro | ModelVersion::V2ProPlus => {
+                32000
+            }
             ModelVersion::V3 => 24000,
             ModelVersion::V4 => 48000,
         }
@@ -39,6 +41,10 @@ impl ModelVersion {
             ModelVersion::V1 => "v1",
             _ => "v2",
         }
+    }
+
+    pub fn uses_speaker_embedding(&self) -> bool {
+        matches!(self, ModelVersion::V2Pro | ModelVersion::V2ProPlus)
     }
 
     pub fn default_sample_steps(&self) -> usize {
