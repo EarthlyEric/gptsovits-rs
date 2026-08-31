@@ -23,7 +23,7 @@
 - 🤖 **100% 兼容 OpenAI TTS API**：完全遵循 **OpenAPI 3.1.0** 規範，相容官方 OpenAI Python/Node SDK 及所有支援 OpenAI TTS 的前端應用（如 NextChat, LibreChat, Dify 等）。
 - 🚀 **硬體加速推論**：透過 `ort`（ONNX Runtime 2.x C API）直接呼叫 CPU 與 NVIDIA CUDA / TensorRT 硬體加速。
 - 🎵 **豐富音訊格式輸出**：支援 `mp3`, `opus`, `aac`, `flac`, `wav`, `pcm` 格式與即時串流（Binary Audio 與 SSE）。
-- 🧬 **零樣本語音複製（Zero-Shot Cloning）**：支援標準音色名稱（如 `alloy`, `echo`）與動態傳入參考音訊的自訂 Voice Object。
+- 🧬 **零樣本語音複製（Zero-Shot Cloning）**：支援自訂音色名稱（如 `alloy`, `echo`）與動態傳入參考音訊的自訂 Voice Object。
 
 ---
 
