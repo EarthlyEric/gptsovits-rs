@@ -181,6 +181,8 @@ impl Default for CustomModelConfig {
 pub struct ModelsConfig {
     #[serde(default = "default_model_version")]
     pub default_version: String,
+    #[serde(default)]
+    pub enabled_base_versions: Vec<String>,
     #[serde(default = "default_cnhubert_path")]
     pub cnhubert_path: String,
     #[serde(default = "default_bert_path")]
@@ -231,6 +233,7 @@ impl Default for ModelsConfig {
     fn default() -> Self {
         Self {
             default_version: default_model_version(),
+            enabled_base_versions: Vec::new(),
             cnhubert_path: default_cnhubert_path(),
             bert_path: default_bert_path(),
             bert_tokenizer_path: default_tokenizer_path(),

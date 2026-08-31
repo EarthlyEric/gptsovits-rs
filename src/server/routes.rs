@@ -243,23 +243,29 @@ pub async fn list_models(State(state): State<AppState>) -> Json<ModelListRespons
 
     let mut data = Vec::new();
 
-    // 1. Official Base Models
-    let base_models = vec![
-        "gpt-4o-mini-tts",
-        "tts-1",
-        "tts-1-hd",
-        "gpt-sovits",
-        "gpt-sovits-v1",
-        "gpt-sovits-v2",
-        "gpt-sovits-v2pro",
-        "gpt-sovits-v2proplus",
-        "gpt-sovits-v3",
-        "gpt-sovits-v4",
-    ];
-
-    for id in base_models {
+    // 1. Official Base Models (only loaded versions)
+    let loaded_bases = state.model_manager.list_loaded_base_versions();
+    if !loaded_bases.is_empty() {
+        for alias in ["gpt-4o-mini-tts", "tts-1", "tts-1-hd", "gpt-sovits"] {
+            data.push(ModelObject {
+                id: alias.to_string(),
+                object: "model".to_string(),
+                created: now,
+                owned_by: "official-base".to_string(),
+            });
+        }
+    }
+    for ver in loaded_bases {
+        let name = match ver {
+            crate::engine::ModelVersion::V1 => "gpt-sovits-v1",
+            crate::engine::ModelVersion::V2 => "gpt-sovits-v2",
+            crate::engine::ModelVersion::V2Pro => "gpt-sovits-v2pro",
+            crate::engine::ModelVersion::V2ProPlus => "gpt-sovits-v2proplus",
+            crate::engine::ModelVersion::V3 => "gpt-sovits-v3",
+            crate::engine::ModelVersion::V4 => "gpt-sovits-v4",
+        };
         data.push(ModelObject {
-            id: id.to_string(),
+            id: name.to_string(),
             object: "model".to_string(),
             created: now,
             owned_by: "official-base".to_string(),

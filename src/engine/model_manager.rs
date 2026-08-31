@@ -74,135 +74,176 @@ impl ModelManager {
         let mut cfm_models = HashMap::new();
         let mut custom_models = HashMap::new();
 
+        let enabled_versions: Vec<ModelVersion> = if config.models.enabled_base_versions.is_empty() {
+            vec![default_version]
+        } else if config
+            .models
+            .enabled_base_versions
+            .iter()
+            .any(|v| v.eq_ignore_ascii_case("all"))
+        {
+            vec![
+                ModelVersion::V1,
+                ModelVersion::V2,
+                ModelVersion::V2Pro,
+                ModelVersion::V2ProPlus,
+                ModelVersion::V3,
+                ModelVersion::V4,
+            ]
+        } else {
+            let mut vers: Vec<ModelVersion> = config
+                .models
+                .enabled_base_versions
+                .iter()
+                .map(|s| ModelVersion::from_str_loose(s))
+                .collect();
+            if !vers.contains(&default_version) {
+                vers.push(default_version);
+            }
+            vers
+        };
+
         // 1. Base Models (V1)
-        t2s_models.insert(
-            ModelVersion::V1,
-            T2SModel::new(
-                &config.models.v1.t2s_encoder_path,
-                &config.models.v1.t2s_fsdec_path,
-                &config.models.v1.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        vits_models.insert(
-            ModelVersion::V1,
-            VitsV1V2Model::new(
-                &config.models.v1.vits_path,
-                config.models.v1.sampling_rate,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V1) {
+            t2s_models.insert(
+                ModelVersion::V1,
+                T2SModel::new(
+                    &config.models.v1.t2s_encoder_path,
+                    &config.models.v1.t2s_fsdec_path,
+                    &config.models.v1.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            vits_models.insert(
+                ModelVersion::V1,
+                VitsV1V2Model::new(
+                    &config.models.v1.vits_path,
+                    config.models.v1.sampling_rate,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 2. Base Models (V2)
-        t2s_models.insert(
-            ModelVersion::V2,
-            T2SModel::new(
-                &config.models.v2.t2s_encoder_path,
-                &config.models.v2.t2s_fsdec_path,
-                &config.models.v2.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        vits_models.insert(
-            ModelVersion::V2,
-            VitsV1V2Model::new(
-                &config.models.v2.vits_path,
-                config.models.v2.sampling_rate,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V2) {
+            t2s_models.insert(
+                ModelVersion::V2,
+                T2SModel::new(
+                    &config.models.v2.t2s_encoder_path,
+                    &config.models.v2.t2s_fsdec_path,
+                    &config.models.v2.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            vits_models.insert(
+                ModelVersion::V2,
+                VitsV1V2Model::new(
+                    &config.models.v2.vits_path,
+                    config.models.v2.sampling_rate,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 3. Base Models (V2Pro)
-        t2s_models.insert(
-            ModelVersion::V2Pro,
-            T2SModel::new(
-                &config.models.v2_pro.t2s_encoder_path,
-                &config.models.v2_pro.t2s_fsdec_path,
-                &config.models.v2_pro.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        vits_models.insert(
-            ModelVersion::V2Pro,
-            VitsV1V2Model::new(
-                &config.models.v2_pro.vits_path,
-                config.models.v2_pro.sampling_rate,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V2Pro) {
+            t2s_models.insert(
+                ModelVersion::V2Pro,
+                T2SModel::new(
+                    &config.models.v2_pro.t2s_encoder_path,
+                    &config.models.v2_pro.t2s_fsdec_path,
+                    &config.models.v2_pro.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            vits_models.insert(
+                ModelVersion::V2Pro,
+                VitsV1V2Model::new(
+                    &config.models.v2_pro.vits_path,
+                    config.models.v2_pro.sampling_rate,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 4. Base Models (V2ProPlus)
-        t2s_models.insert(
-            ModelVersion::V2ProPlus,
-            T2SModel::new(
-                &config.models.v2_pro_plus.t2s_encoder_path,
-                &config.models.v2_pro_plus.t2s_fsdec_path,
-                &config.models.v2_pro_plus.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        vits_models.insert(
-            ModelVersion::V2ProPlus,
-            VitsV1V2Model::new(
-                &config.models.v2_pro_plus.vits_path,
-                config.models.v2_pro_plus.sampling_rate,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V2ProPlus) {
+            t2s_models.insert(
+                ModelVersion::V2ProPlus,
+                T2SModel::new(
+                    &config.models.v2_pro_plus.t2s_encoder_path,
+                    &config.models.v2_pro_plus.t2s_fsdec_path,
+                    &config.models.v2_pro_plus.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            vits_models.insert(
+                ModelVersion::V2ProPlus,
+                VitsV1V2Model::new(
+                    &config.models.v2_pro_plus.vits_path,
+                    config.models.v2_pro_plus.sampling_rate,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 5. Base Models (V3)
-        t2s_models.insert(
-            ModelVersion::V3,
-            T2SModel::new(
-                &config.models.v3.t2s_encoder_path,
-                &config.models.v3.t2s_fsdec_path,
-                &config.models.v3.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        cfm_models.insert(
-            ModelVersion::V3,
-            CfmV3V4Model::new(
-                &config.models.v3.dit_path,
-                &config.models.v3.vocoder_path,
-                config.models.v3.sampling_rate,
-                config.models.v3.sample_steps,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V3) {
+            t2s_models.insert(
+                ModelVersion::V3,
+                T2SModel::new(
+                    &config.models.v3.t2s_encoder_path,
+                    &config.models.v3.t2s_fsdec_path,
+                    &config.models.v3.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            cfm_models.insert(
+                ModelVersion::V3,
+                CfmV3V4Model::new(
+                    &config.models.v3.dit_path,
+                    &config.models.v3.vocoder_path,
+                    config.models.v3.sampling_rate,
+                    config.models.v3.sample_steps,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 6. Base Models (V4)
-        t2s_models.insert(
-            ModelVersion::V4,
-            T2SModel::new(
-                &config.models.v4.t2s_encoder_path,
-                &config.models.v4.t2s_fsdec_path,
-                &config.models.v4.t2s_sdec_path,
-                intra_threads,
-                inter_threads,
-            ),
-        );
-        cfm_models.insert(
-            ModelVersion::V4,
-            CfmV3V4Model::new(
-                &config.models.v4.dit_path,
-                &config.models.v4.vocoder_path,
-                config.models.v4.sampling_rate,
-                config.models.v4.sample_steps,
-                intra_threads,
-                inter_threads,
-            ),
-        );
+        if enabled_versions.contains(&ModelVersion::V4) {
+            t2s_models.insert(
+                ModelVersion::V4,
+                T2SModel::new(
+                    &config.models.v4.t2s_encoder_path,
+                    &config.models.v4.t2s_fsdec_path,
+                    &config.models.v4.t2s_sdec_path,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+            cfm_models.insert(
+                ModelVersion::V4,
+                CfmV3V4Model::new(
+                    &config.models.v4.dit_path,
+                    &config.models.v4.vocoder_path,
+                    config.models.v4.sampling_rate,
+                    config.models.v4.sample_steps,
+                    intra_threads,
+                    inter_threads,
+                ),
+            );
+        }
 
         // 7. Custom Fine-tuned Models
         for (name, custom_cfg) in &config.models.custom {
@@ -333,7 +374,26 @@ impl ModelManager {
 
     pub fn has_model(&self, model_name: &str) -> bool {
         let name = model_name.trim().to_ascii_lowercase();
-        self.custom_models.contains_key(&name) || self.base_version_for_name(&name).is_some()
+        if self.custom_models.contains_key(&name) {
+            return true;
+        }
+        if let Some(base_ver) = self.base_version_for_name(&name) {
+            return self.t2s_models.contains_key(&base_ver);
+        }
+        false
+    }
+
+    pub fn list_loaded_base_versions(&self) -> Vec<ModelVersion> {
+        let mut versions: Vec<ModelVersion> = self.t2s_models.keys().copied().collect();
+        versions.sort_by_key(|v| match v {
+            ModelVersion::V1 => 1,
+            ModelVersion::V2 => 2,
+            ModelVersion::V2Pro => 3,
+            ModelVersion::V2ProPlus => 4,
+            ModelVersion::V3 => 5,
+            ModelVersion::V4 => 6,
+        });
+        versions
     }
 
     pub fn list_custom_models(&self) -> Vec<(String, ModelVersion)> {

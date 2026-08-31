@@ -99,13 +99,26 @@ fn preload_cuda_dependencies(runtime: &RuntimeConfig) -> anyhow::Result<()> {
 
 fn initialize_onnx_runtime(runtime: &RuntimeConfig) -> anyhow::Result<()> {
     let device = runtime.device.trim().to_ascii_lowercase();
-    let builder = ort::init().with_telemetry(false);
+    let intra_threads = runtime.intra_threads.max(1);
+    let inter_threads = runtime.inter_threads.max(1);
+
+    let thread_options = ort::environment::GlobalThreadPoolOptions::default()
+        .with_intra_threads(intra_threads)?
+        .with_inter_threads(inter_threads)?
+        .with_spin_control(false)?;
+
+    let builder = ort::init()
+        .with_telemetry(false)
+        .with_global_thread_pool(thread_options);
 
     match device.as_str() {
         "cuda" => {
             preload_cuda_dependencies(runtime)?;
             let cuda_provider = ort::ep::CUDA::default()
                 .with_device_id(runtime.cuda_device_id)
+                .with_arena_extend_strategy(ort::ep::ArenaExtendStrategy::SameAsRequested)
+                .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+                .with_conv_max_workspace(false)
                 .with_tf32(true);
 
             if !ort::ep::ExecutionProvider::is_available(&cuda_provider)? {
@@ -122,14 +135,20 @@ fn initialize_onnx_runtime(runtime: &RuntimeConfig) -> anyhow::Result<()> {
             }
             info!(
                 device_id = runtime.cuda_device_id,
-                "ONNX Runtime CUDAExecutionProvider registered"
+                intra_threads,
+                inter_threads,
+                "ONNX Runtime CUDAExecutionProvider registered with shared global thread pool"
             );
         }
         "cpu" => {
             if !builder.commit() {
                 anyhow::bail!("ONNX Runtime environment was already initialized");
             }
-            info!("ONNX Runtime CPUExecutionProvider selected");
+            info!(
+                intra_threads,
+                inter_threads,
+                "ONNX Runtime CPUExecutionProvider selected with shared global thread pool"
+            );
         }
         _ => anyhow::bail!(
             "Unsupported runtime.device '{}'; expected 'cuda' or 'cpu'",

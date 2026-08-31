@@ -6,7 +6,7 @@ max_concurrency = 8
 voices_config = "voices.toml"
 
 [runtime]
-device = "cuda" # "cuda" or "cpu"
+device = "cpu" # "cuda" or "cpu"
 cuda_device_id = 0
 # CUDA 13/cuDNN library directories. Leave empty when they are already on the linker path.
 # cuda_lib_dir = "/path/to/cuda13/lib"
@@ -16,6 +16,9 @@ inter_threads = 2
 
 [models]
 default_version = "v2" # "v1", "v2", "v2Pro", "v2ProPlus", "v3", "v4"
+# 啟用的官方底模清單。留空時僅載入 default_version 以最大化節省 VRAM。
+# 若需支援多種底模可設定如 ["v2", "v2ProPlus"] 或 ["all"]。
+# enabled_base_versions = ["v2"]
 cnhubert_path = "models/chinese-hubert-base/cnhubert.onnx"
 bert_path = "models/chinese-roberta-wwm-ext-large/bert.onnx"
 bert_tokenizer_path = "models/chinese-roberta-wwm-ext-large/tokenizer.json"

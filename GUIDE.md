@@ -133,6 +133,8 @@ inter_threads = 2
 
 [models]
 default_version = "v2" # 預設使用的模型版本
+# 啟用的官方底模清單。留空時僅載入 default_version 以最大化節省 VRAM。
+# enabled_base_versions = ["v2"]
 cnhubert_path = "models/chinese-hubert-base/cnhubert.onnx"
 bert_path = "models/chinese-roberta-wwm-ext-large/bert.onnx"
 bert_tokenizer_path = "models/chinese-roberta-wwm-ext-large/tokenizer.json"
@@ -172,6 +174,16 @@ sampling_rate = 32000
 | `cudnn_lib_dir` | string | `""` | 指定 cuDNN 動態庫（`libcudnn.so.9` 等）所在目錄。若已在系統動態庫搜尋路徑中可留空。 |
 | `intra_threads` | integer | `4` | 每個 ONNX 推論運算元內部之執行緒並行數（Intra-op threads）。 |
 | `inter_threads` | integer | `2` | ONNX 計算圖運算元之間之並行調度執行緒數（Inter-op threads）。 |
+
+#### 模型參數表 (`[models]`)
+
+| 欄位名稱 | 型別 | 預設值 | 說明 |
+| :--- | :---: | :---: | :--- |
+| `default_version` | string | `"v2"` | 預設底模版本（`"v1"`, `"v2"`, `"v2Pro"`, `"v2ProPlus"`, `"v3"`, `"v4"`）。 |
+| `enabled_base_versions` | array | `[]` | 啟用的官方底模清單（如 `["v2"]` 或 `["all"]`）。**留空時僅載入 `default_version`，大幅節省 VRAM**。 |
+| `cnhubert_path` | string | `"models/chinese-hubert-base/cnhubert.onnx"` | CNHuBERT 語音特徵抽取模型路徑。 |
+| `bert_path` | string | `"models/chinese-roberta-wwm-ext-large/bert.onnx"` | Chinese RoBERTa 文本語義特徵模型路徑。 |
+| `speaker_path` | string | `"models/sv.onnx"` | ERes2NetV2 聲紋特徵抽取模型路徑（V2Pro/V2ProPlus 必要）。 |
 
 ### 4.2 音色預設 (`voices.toml`)
 
@@ -455,6 +467,10 @@ docker build -t gptsovits-rs:latest .
   1. **（推薦）使用 Docker Compose 部署**：執行 `docker compose up -d --build`，容器內建完整的 CUDA 13 + cuDNN 環境，開箱即用。
   2. **手動指定路徑**：若有 CUDA 13 庫檔案，可在 `config.toml` 中配置 `[runtime] cuda_lib_dir = "/path/to/cuda13/lib"`。
   3. **切換為純 CPU 模式**：在 `config.toml` 中將 `[runtime] device = "cpu"` 即可於純 CPU 模式下順暢運行。
+
+### Q2: 推論時出現 `CUDA error cudaErrorNoKernelImageForDevice: no kernel image is available`
+* **原因**：目前 ONNX Runtime 預編譯發行包內建之 CUDA kernel 支援至 `sm_75` (Turing)、`sm_80` (Ampere/A100)、`sm_90` (Hopper)。在最新的 RTX 5000 系列（Blackwell 架構，`sm_120`）若無對應 PTX，CUDA 會報無可用 Kernel。
+* **處置方案**：RTX 5000 系列顯卡請暫時於 `config.toml` 設定 `[runtime] device = "cpu"` 運行，或待 upstream ONNX Runtime 發布含 Blackwell PTX 之 CUDA 套件。RTX 20/30/40 系列與 A100/H100 可直接享受完整 CUDA 硬體加速。
 
 ### Q2: 如何確認模型是否有真正使用 GPU 進行推論？
 啟動伺服器後發送合成請求，並在終端機執行：
