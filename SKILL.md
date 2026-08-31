@@ -150,9 +150,9 @@ Reference audio must be 3–10 seconds; the server returns 400 `missing_referenc
 # Run directly
 ./target/release/gptsovits-rs -c config.toml
 
-# Or via Docker Compose (mounts ./config.toml, ./voices.toml, ./models, ./voices)
+# Or via Docker Compose (CUDA 13 + cuDNN image; requires NVIDIA Container Toolkit)
 mkdir -p models voices
-docker compose up -d
+docker compose up -d --build
 docker compose logs -f
 ```
 
@@ -205,4 +205,3 @@ Do not run `git commit` / `git push` unless the user explicitly asks.
 - **Model load warnings**: `T2S/VITS/CFM/CNHuBERT/RoBERTa ONNX model file not found` means the file at that path is missing; check `config.toml` paths and the model directory.
 - **`/health` fails**: confirm the container is running and `docker compose ps` shows healthy.
 - **Ignored integration tests**: tests in `tests/api_integration_tests.rs` that need external ONNX assets are `#[ignore]`d by default; run them with `cargo test -- --ignored` once the models are ready.
-

@@ -11,7 +11,7 @@ pub struct CfmV3V4Model {
     default_sample_steps: usize,
 }
 
-fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
+fn load_session<P: AsRef<Path>>(path: P, intra_threads: usize, inter_threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
         tracing::warn!(path = %path_ref.display(), "CFM/Vocoder ONNX model file not found");
@@ -24,10 +24,17 @@ fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
             return None;
         }
     };
-    let mut builder = match builder.with_intra_threads(threads) {
+    let builder = match builder.with_intra_threads(intra_threads) {
         Ok(builder) => builder,
         Err(error) => {
             tracing::warn!(path = %path_ref.display(), %error, "Failed to configure CFM/Vocoder ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_inter_threads(inter_threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure CFM/Vocoder inter-op threads");
             return None;
         }
     };
@@ -46,9 +53,11 @@ impl CfmV3V4Model {
         vocoder_path: P,
         _sampling_rate: u32,
         default_sample_steps: usize,
+        intra_threads: usize,
+        inter_threads: usize,
     ) -> Self {
-        let dit_session = load_session(dit_path, 4);
-        let vocoder_session = load_session(vocoder_path, 4);
+        let dit_session = load_session(dit_path, intra_threads, inter_threads);
+        let vocoder_session = load_session(vocoder_path, intra_threads, inter_threads);
 
         Self {
             dit_session: Mutex::new(dit_session),

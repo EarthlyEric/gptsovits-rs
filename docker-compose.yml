@@ -6,6 +6,7 @@ services:
       dockerfile: Dockerfile
     container_name: gptsovits-rs
     restart: unless-stopped
+    gpus: all
     ports:
       - "9880:9880"
     volumes:
@@ -14,8 +15,16 @@ services:
       - ./models:/app/models
       - ./voices:/app/voices
     environment:
-      - RUST_LOG=info,gptsovits_rs=info,tower_http=info,axum=info
-    # NVIDIA GPU Acceleration (Optional: requires nvidia-container-toolkit)
+      RUST_LOG: info,gptsovits_rs=info,tower_http=info,axum=info
+      CUDA_VISIBLE_DEVICES: "0"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      CUDA_HOME: /usr/local/cuda
+      ORT_CUDA_LIB_DIR: /usr/local/cuda/lib64
+      ORT_CUDNN_LIB_DIR: /usr/lib/x86_64-linux-gnu
+      LD_LIBRARY_PATH: /usr/local/cuda/lib64:/usr/local/cuda/targets/x86_64-linux/lib:/usr/local/lib:/usr/local/bin
+    # Keep this reservation for Compose implementations that do not support
+    # the short `gpus` field. Requires nvidia-container-toolkit on the host.
     deploy:
       resources:
         reservations:

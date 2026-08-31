@@ -142,9 +142,13 @@ uv run tools/onnx_exporter.py \
 ### 使用 Docker Compose 一鍵啟動
 
 ```bash
-# 建立目錄並啟動
+# 前置條件：NVIDIA Driver、Docker Compose 與 nvidia-container-toolkit
+# 確認 Docker 可以存取 GPU
+docker run --rm --gpus all nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 nvidia-smi
+
+# 建立目錄並啟動 CUDA 13 + cuDNN 服務
 mkdir -p models voices
-docker compose up -d
+docker compose up -d --build
 
 # 查看即時日誌
 docker compose logs -f
@@ -158,6 +162,9 @@ docker pull ghcr.io/earthlyeric6/gptsovits-rs:latest
 docker run -d \
   --name gptsovits-rs \
   -p 9880:9880 \
+  --gpus all \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   -v $(pwd)/config.toml:/app/config.toml:ro \
   -v $(pwd)/voices.toml:/app/voices.toml:ro \
   -v $(pwd)/models:/app/models \

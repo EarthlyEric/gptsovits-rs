@@ -122,6 +122,10 @@ voices_config = "voices.toml"
 
 [runtime]
 device = "cuda" # "cuda" 或 "cpu"
+cuda_device_id = 0
+# CUDA 13/cuDNN 路徑；Docker 部署使用 image 內建路徑，通常不需設定
+# cuda_lib_dir = "/path/to/cuda13/lib"
+# cudnn_lib_dir = "/path/to/cudnn/lib"
 intra_threads = 4
 inter_threads = 2
 

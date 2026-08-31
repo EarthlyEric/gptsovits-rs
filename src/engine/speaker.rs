@@ -12,7 +12,7 @@ pub struct SpeakerEmbeddingModel {
     session: Mutex<Option<Session>>,
 }
 
-fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
+fn load_session<P: AsRef<Path>>(path: P, intra_threads: usize, inter_threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
         tracing::warn!(path = %path_ref.display(), "Speaker embedding ONNX model file not found");
@@ -26,10 +26,17 @@ fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
             return None;
         }
     };
-    let mut builder = match builder.with_intra_threads(threads) {
+    let builder = match builder.with_intra_threads(intra_threads) {
         Ok(builder) => builder,
         Err(error) => {
             tracing::warn!(path = %path_ref.display(), %error, "Failed to configure speaker embedding ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_inter_threads(inter_threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure speaker inter-op threads");
             return None;
         }
     };
@@ -44,8 +51,12 @@ fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
 }
 
 impl SpeakerEmbeddingModel {
-    pub fn new<P: AsRef<Path>>(model_path: P) -> Self {
-        let session = load_session(model_path, 4);
+    pub fn new<P: AsRef<Path>>(
+        model_path: P,
+        intra_threads: usize,
+        inter_threads: usize,
+    ) -> Self {
+        let session = load_session(model_path, intra_threads, inter_threads);
         Self {
             session: Mutex::new(session),
         }

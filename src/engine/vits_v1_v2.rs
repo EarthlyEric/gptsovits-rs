@@ -10,7 +10,7 @@ pub struct VitsV1V2Model {
     has_speaker_embedding_input: bool,
 }
 
-fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
+fn load_session<P: AsRef<Path>>(path: P, intra_threads: usize, inter_threads: usize) -> Option<Session> {
     let path_ref = path.as_ref();
     if !path_ref.exists() {
         tracing::warn!(path = %path_ref.display(), "VITS ONNX model file not found");
@@ -23,10 +23,17 @@ fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
             return None;
         }
     };
-    let mut builder = match builder.with_intra_threads(threads) {
+    let builder = match builder.with_intra_threads(intra_threads) {
         Ok(builder) => builder,
         Err(error) => {
             tracing::warn!(path = %path_ref.display(), %error, "Failed to configure VITS ONNX session");
+            return None;
+        }
+    };
+    let mut builder = match builder.with_inter_threads(inter_threads) {
+        Ok(builder) => builder,
+        Err(error) => {
+            tracing::warn!(path = %path_ref.display(), %error, "Failed to configure VITS inter-op threads");
             return None;
         }
     };
@@ -40,8 +47,13 @@ fn load_session<P: AsRef<Path>>(path: P, threads: usize) -> Option<Session> {
 }
 
 impl VitsV1V2Model {
-    pub fn new<P: AsRef<Path>>(model_path: P, _sampling_rate: u32) -> Self {
-        let session = load_session(model_path, 4);
+    pub fn new<P: AsRef<Path>>(
+        model_path: P,
+        _sampling_rate: u32,
+        intra_threads: usize,
+        inter_threads: usize,
+    ) -> Self {
+        let session = load_session(model_path, intra_threads, inter_threads);
         let has_speaker_embedding_input = session
             .as_ref()
             .map(|session| {

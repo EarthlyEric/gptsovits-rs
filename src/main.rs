@@ -1,13 +1,145 @@
 use clap::Parser;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use gptsovits_rs::config::AppConfig;
+use gptsovits_rs::config::{AppConfig, RuntimeConfig};
 use gptsovits_rs::engine::ModelManager;
 use gptsovits_rs::server::create_router;
 use gptsovits_rs::voice::VoiceManager;
+
+fn add_library_roots(roots: &mut Vec<PathBuf>, value: Option<std::ffi::OsString>) {
+    let Some(value) = value else {
+        return;
+    };
+    if value.is_empty() {
+        return;
+    }
+    roots.extend(std::env::split_paths(&value));
+}
+
+fn cuda_library_roots(runtime: &RuntimeConfig) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    add_library_roots(&mut roots, Some(runtime.cuda_lib_dir.clone().into()));
+    add_library_roots(&mut roots, Some(runtime.cudnn_lib_dir.clone().into()));
+    add_library_roots(&mut roots, std::env::var_os("ORT_CUDA_LIB_DIR"));
+    add_library_roots(&mut roots, std::env::var_os("ORT_CUDNN_LIB_DIR"));
+    add_library_roots(&mut roots, std::env::var_os("LD_LIBRARY_PATH"));
+
+    for base in [
+        std::env::var_os("CUDA_HOME").map(PathBuf::from),
+        std::env::var_os("CUDA_PATH").map(PathBuf::from),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        roots.push(base.clone());
+        roots.push(base.join("lib64"));
+        roots.push(base.join("lib"));
+        roots.push(base.join("targets/x86_64-linux/lib"));
+    }
+
+    roots.sort();
+    roots.dedup();
+    roots
+}
+
+fn preload_library(name: &str, roots: &[PathBuf]) -> anyhow::Result<()> {
+    for root in roots {
+        let path = root.join(name);
+        if path.is_file() {
+            ort::util::preload_dylib(&path).map_err(|error| {
+                anyhow::anyhow!("failed to preload {} from {}: {}", name, path.display(), error)
+            })?;
+            return Ok(());
+        }
+    }
+
+    ort::util::preload_dylib(name).map_err(|error| {
+        anyhow::anyhow!(
+            "failed to preload {} from the dynamic linker search path: {}",
+            name,
+            error
+        )
+    })
+}
+
+fn preload_cuda_dependencies(runtime: &RuntimeConfig) -> anyhow::Result<()> {
+    // ort's CUDA 13 distribution keeps these dependencies outside the provider .so.
+    const REQUIRED_LIBRARIES: &[&str] = &[
+        "libcudart.so.13",
+        "libcublasLt.so.13",
+        "libcublas.so.13",
+        "libcurand.so.10",
+    ];
+    let roots = cuda_library_roots(runtime);
+    let mut missing = Vec::new();
+
+    for library in REQUIRED_LIBRARIES {
+        if let Err(error) = preload_library(library, &roots) {
+            tracing::debug!(library, %error, "CUDA dependency was not found");
+            missing.push(*library);
+        }
+    }
+
+    if !missing.is_empty() {
+        anyhow::bail!(
+            "CUDAExecutionProvider dependencies are missing: {}. Set runtime.cuda_lib_dir or ORT_CUDA_LIB_DIR to the CUDA 13 library directory",
+            missing.join(", ")
+        );
+    }
+
+    if let Err(error) = preload_library("libcudnn.so.9", &roots) {
+        tracing::debug!(%error, "cuDNN library was not preloaded; ONNX Runtime may not require it");
+    }
+    Ok(())
+}
+
+fn initialize_onnx_runtime(runtime: &RuntimeConfig) -> anyhow::Result<()> {
+    let device = runtime.device.trim().to_ascii_lowercase();
+    let builder = ort::init().with_telemetry(false);
+
+    match device.as_str() {
+        "cuda" => {
+            preload_cuda_dependencies(runtime)?;
+            let cuda_provider = ort::ep::CUDA::default()
+                .with_device_id(runtime.cuda_device_id)
+                .with_tf32(true);
+
+            if !ort::ep::ExecutionProvider::is_available(&cuda_provider)? {
+                anyhow::bail!(
+                    "CUDAExecutionProvider is not available in this ONNX Runtime build"
+                );
+            }
+
+            if !builder
+                .with_execution_providers([cuda_provider.build().error_on_failure()])
+                .commit()
+            {
+                anyhow::bail!("ONNX Runtime environment was already initialized");
+            }
+            info!(
+                device_id = runtime.cuda_device_id,
+                "ONNX Runtime CUDAExecutionProvider registered"
+            );
+        }
+        "cpu" => {
+            if !builder.commit() {
+                anyhow::bail!("ONNX Runtime environment was already initialized");
+            }
+            info!("ONNX Runtime CPUExecutionProvider selected");
+        }
+        _ => anyhow::bail!(
+            "Unsupported runtime.device '{}'; expected 'cuda' or 'cpu'",
+            device
+        ),
+    }
+
+    info!("ONNX Runtime build: {}", ort::info());
+    Ok(())
+}
 
 #[derive(Parser, Debug)]
 #[command(
@@ -60,6 +192,9 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Initializing GPT-SoVITS Pure Rust Inference Engine...");
     info!("Runtime device target: {}", config.runtime.device);
+
+    // Configure the process-global ONNX Runtime environment before creating any session.
+    initialize_onnx_runtime(&config.runtime)?;
 
     // 3. Load Voice Manager
     let voice_manager = Arc::new(

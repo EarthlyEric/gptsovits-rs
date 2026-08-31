@@ -7,6 +7,10 @@ voices_config = "voices.toml"
 
 [runtime]
 device = "cuda" # "cuda" or "cpu"
+cuda_device_id = 0
+# CUDA 13/cuDNN library directories. Leave empty when they are already on the linker path.
+# cuda_lib_dir = "/path/to/cuda13/lib"
+# cudnn_lib_dir = "/path/to/cudnn/lib"
 intra_threads = 4
 inter_threads = 2
 

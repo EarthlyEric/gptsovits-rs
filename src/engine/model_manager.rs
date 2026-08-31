@@ -39,10 +39,24 @@ pub struct ModelManager {
 impl ModelManager {
     pub fn new(config: &AppConfig) -> Self {
         let default_version = ModelVersion::from_str_loose(&config.models.default_version);
+        let intra_threads = config.runtime.intra_threads.max(1);
+        let inter_threads = config.runtime.inter_threads.max(1);
 
-        let cnhubert = CNHuBERTModel::new(&config.models.cnhubert_path);
-        let roberta = RoBERTaModel::new(&config.models.bert_path);
-        let speaker = SpeakerEmbeddingModel::new(&config.models.speaker_path);
+        let cnhubert = CNHuBERTModel::new(
+            &config.models.cnhubert_path,
+            intra_threads,
+            inter_threads,
+        );
+        let roberta = RoBERTaModel::new(
+            &config.models.bert_path,
+            intra_threads,
+            inter_threads,
+        );
+        let speaker = SpeakerEmbeddingModel::new(
+            &config.models.speaker_path,
+            intra_threads,
+            inter_threads,
+        );
         let tokenizer = match BertTokenizer::from_file(&config.models.bert_tokenizer_path) {
             Ok(tokenizer) => Some(tokenizer),
             Err(error) => {
@@ -67,11 +81,18 @@ impl ModelManager {
                 &config.models.v1.t2s_encoder_path,
                 &config.models.v1.t2s_fsdec_path,
                 &config.models.v1.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         vits_models.insert(
             ModelVersion::V1,
-            VitsV1V2Model::new(&config.models.v1.vits_path, config.models.v1.sampling_rate),
+            VitsV1V2Model::new(
+                &config.models.v1.vits_path,
+                config.models.v1.sampling_rate,
+                intra_threads,
+                inter_threads,
+            ),
         );
 
         // 2. Base Models (V2)
@@ -81,11 +102,18 @@ impl ModelManager {
                 &config.models.v2.t2s_encoder_path,
                 &config.models.v2.t2s_fsdec_path,
                 &config.models.v2.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         vits_models.insert(
             ModelVersion::V2,
-            VitsV1V2Model::new(&config.models.v2.vits_path, config.models.v2.sampling_rate),
+            VitsV1V2Model::new(
+                &config.models.v2.vits_path,
+                config.models.v2.sampling_rate,
+                intra_threads,
+                inter_threads,
+            ),
         );
 
         // 3. Base Models (V2Pro)
@@ -95,6 +123,8 @@ impl ModelManager {
                 &config.models.v2_pro.t2s_encoder_path,
                 &config.models.v2_pro.t2s_fsdec_path,
                 &config.models.v2_pro.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         vits_models.insert(
@@ -102,6 +132,8 @@ impl ModelManager {
             VitsV1V2Model::new(
                 &config.models.v2_pro.vits_path,
                 config.models.v2_pro.sampling_rate,
+                intra_threads,
+                inter_threads,
             ),
         );
 
@@ -112,6 +144,8 @@ impl ModelManager {
                 &config.models.v2_pro_plus.t2s_encoder_path,
                 &config.models.v2_pro_plus.t2s_fsdec_path,
                 &config.models.v2_pro_plus.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         vits_models.insert(
@@ -119,6 +153,8 @@ impl ModelManager {
             VitsV1V2Model::new(
                 &config.models.v2_pro_plus.vits_path,
                 config.models.v2_pro_plus.sampling_rate,
+                intra_threads,
+                inter_threads,
             ),
         );
 
@@ -129,6 +165,8 @@ impl ModelManager {
                 &config.models.v3.t2s_encoder_path,
                 &config.models.v3.t2s_fsdec_path,
                 &config.models.v3.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         cfm_models.insert(
@@ -138,6 +176,8 @@ impl ModelManager {
                 &config.models.v3.vocoder_path,
                 config.models.v3.sampling_rate,
                 config.models.v3.sample_steps,
+                intra_threads,
+                inter_threads,
             ),
         );
 
@@ -148,6 +188,8 @@ impl ModelManager {
                 &config.models.v4.t2s_encoder_path,
                 &config.models.v4.t2s_fsdec_path,
                 &config.models.v4.t2s_sdec_path,
+                intra_threads,
+                inter_threads,
             ),
         );
         cfm_models.insert(
@@ -157,6 +199,8 @@ impl ModelManager {
                 &config.models.v4.vocoder_path,
                 config.models.v4.sampling_rate,
                 config.models.v4.sample_steps,
+                intra_threads,
+                inter_threads,
             ),
         );
 
@@ -219,16 +263,37 @@ impl ModelManager {
                 String::new()
             };
 
-            let t2s = T2SModel::new(&enc_path, &fsdec_path, &sdec_path);
+            let t2s = T2SModel::new(
+                &enc_path,
+                &fsdec_path,
+                &sdec_path,
+                intra_threads,
+                inter_threads,
+            );
 
             let (vits, cfm) = match ver {
                 ModelVersion::V1
                 | ModelVersion::V2
                 | ModelVersion::V2Pro
-                | ModelVersion::V2ProPlus => (Some(VitsV1V2Model::new(&vits_path, sr)), None),
+                | ModelVersion::V2ProPlus => (
+                    Some(VitsV1V2Model::new(
+                        &vits_path,
+                        sr,
+                        intra_threads,
+                        inter_threads,
+                    )),
+                    None,
+                ),
                 ModelVersion::V3 | ModelVersion::V4 => (
                     None,
-                    Some(CfmV3V4Model::new(&dit_path, &vocoder_path, sr, steps)),
+                    Some(CfmV3V4Model::new(
+                        &dit_path,
+                        &vocoder_path,
+                        sr,
+                        steps,
+                        intra_threads,
+                        inter_threads,
+                    )),
                 ),
             };
 

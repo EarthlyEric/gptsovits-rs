@@ -38,6 +38,12 @@ fn default_voices_config() -> String {
 pub struct RuntimeConfig {
     #[serde(default = "default_device")]
     pub device: String,
+    #[serde(default = "default_cuda_device_id")]
+    pub cuda_device_id: i32,
+    #[serde(default)]
+    pub cuda_lib_dir: String,
+    #[serde(default)]
+    pub cudnn_lib_dir: String,
     #[serde(default = "default_intra_threads")]
     pub intra_threads: usize,
     #[serde(default = "default_inter_threads")]
@@ -46,6 +52,10 @@ pub struct RuntimeConfig {
 
 fn default_device() -> String {
     "cuda".to_string()
+}
+
+fn default_cuda_device_id() -> i32 {
+    0
 }
 
 fn default_intra_threads() -> usize {
@@ -266,6 +276,9 @@ impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
             device: default_device(),
+            cuda_device_id: default_cuda_device_id(),
+            cuda_lib_dir: String::new(),
+            cudnn_lib_dir: String::new(),
             intra_threads: default_intra_threads(),
             inter_threads: default_inter_threads(),
         }
