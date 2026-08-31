@@ -34,6 +34,9 @@ MODELS_MANIFEST = {
         ("lj1995/GPT-SoVITS", "chinese-roberta-wwm-ext-large/pytorch_model.bin", "chinese-roberta-wwm-ext-large/pytorch_model.bin"),
         ("lj1995/GPT-SoVITS", "chinese-roberta-wwm-ext-large/tokenizer.json", "chinese-roberta-wwm-ext-large/tokenizer.json"),
     ],
+    "speaker": [
+        ("lj1995/GPT-SoVITS", "sv/pretrained_eres2netv2w24s4ep4.ckpt", "sv/pretrained_eres2netv2w24s4ep4.ckpt"),
+    ],
     "v1": [
         ("lj1995/GPT-SoVITS", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt", "s1bert25hz-2kh-longer-epoch=68e-step=50232.ckpt"),
         ("lj1995/GPT-SoVITS", "s2G488k.pth", "s2G488k.pth"),
@@ -45,7 +48,6 @@ MODELS_MANIFEST = {
     "v2pro": [
         ("lj1995/GPT-SoVITS", "v2Pro/s2Gv2Pro.pth", "v2Pro/s2Gv2Pro.pth"),
         ("lj1995/GPT-SoVITS", "v2Pro/s2Gv2ProPlus.pth", "v2Pro/s2Gv2ProPlus.pth"),
-        ("lj1995/GPT-SoVITS", "sv/pretrained_eres2netv2w24s4ep4.ckpt", "sv/pretrained_eres2netv2w24s4ep4.ckpt"),
     ],
     "v3": [
         ("lj1995/GPT-SoVITS", "s1v3.ckpt", "s1v3.ckpt"),
@@ -156,11 +158,11 @@ def main():
     elif args.version == "base":
         categories = ["base"]
     elif args.version in ("v2proplus", "v2pro"):
-        categories = ["base", "v2", "v2pro"]
+        categories = ["base", "v2", "speaker", "v2pro"]
     elif args.version in ("v3", "v4"):
         categories = ["base", "v3", args.version]
     elif args.version == "sandrone":
-        categories = ["base", "sandrone"]
+        categories = ["base", "speaker", "sandrone"]
     else:
         categories = ["base", args.version]
 
@@ -219,8 +221,10 @@ def main():
         base_cmd.extend([
             "--cnhubert-path", os.path.join(args.target_dir, "chinese-hubert-base"),
             "--bert-path", os.path.join(args.target_dir, "chinese-roberta-wwm-ext-large"),
+            "--sv-path", os.path.join(args.target_dir, "sv", "pretrained_eres2netv2w24s4ep4.ckpt"),
             "--output-dir", "models",
         ])
+        base_cmd_env = os.environ.copy()
 
         if args.version.lower() == "sandrone":
             print(f"\n[*] Triggering ONNX export for Sandrone custom fine-tuned model...")
@@ -233,7 +237,7 @@ def main():
                 "--gpt-path", gpt_p,
                 "--sovits-path", sovits_p,
             ])
-            subprocess.run(cmd)
+            subprocess.run(cmd, env=base_cmd_env, check=True)
         else:
             raw_ver = "v2" if args.version in ("all", "base") else args.version
             canonical_map = {
@@ -264,7 +268,7 @@ def main():
                 if os.path.exists(gpt_p) and os.path.exists(sovits_p):
                     cmd.extend(["--gpt-path", gpt_p, "--sovits-path", sovits_p])
 
-            subprocess.run(cmd)
+            subprocess.run(cmd, env=base_cmd_env, check=True)
 
 if __name__ == "__main__":
     main()

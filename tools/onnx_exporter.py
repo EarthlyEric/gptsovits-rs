@@ -42,27 +42,25 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 def ensure_gpt_sovits_repo():
-    candidates = [
+    candidates = []
+    configured_repo = os.environ.get("GPT_SOVITS_UPSTREAM")
+    if configured_repo:
+        candidates.append(configured_repo)
+    candidates.extend([
         os.path.join(project_root, "GPT-SoVITS"),
         os.path.join(project_root, "GPT-SoVITS-src"),
+        os.path.abspath(os.path.join(project_root, "..", "gptsovits_upstream")),
         "/tmp/gpt-sovits-upstream",
-    ]
+    ])
     for c in candidates:
         if os.path.exists(os.path.join(c, "GPT_SoVITS", "onnx_export.py")):
+            c = os.path.abspath(c)
             if c not in sys.path:
                 sys.path.insert(0, c)
             p = os.path.join(c, "GPT_SoVITS")
             if p not in sys.path:
                 sys.path.insert(0, p)
 
-            # Ensure GPT_SoVITS link exists in project root for upstream relative paths
-            src_pretrained = os.path.join(project_root, "GPT-SoVITS", "GPT_SoVITS")
-            link_dir = os.path.join(project_root, "GPT_SoVITS")
-            if os.path.exists(src_pretrained) and not os.path.exists(link_dir):
-                try:
-                    os.symlink(src_pretrained, link_dir)
-                except Exception:
-                    pass
             return c
 
     # Clone into GPT-SoVITS-src if not existing
@@ -80,18 +78,9 @@ def ensure_gpt_sovits_repo():
     if p not in sys.path:
         sys.path.insert(0, p)
 
-    # Ensure GPT_SoVITS link exists in project root
-    src_pretrained = os.path.join(project_root, "GPT-SoVITS", "GPT_SoVITS")
-    link_dir = os.path.join(project_root, "GPT_SoVITS")
-    if os.path.exists(src_pretrained) and not os.path.exists(link_dir):
-        try:
-            os.symlink(src_pretrained, link_dir)
-        except Exception:
-            pass
-
     return target
 
-ensure_gpt_sovits_repo()
+gpt_sovits_repo = ensure_gpt_sovits_repo()
 
 try:
     import torch
@@ -224,8 +213,9 @@ class VitsModel(torch.nn.Module):
         )
         self.vq_model.eval()
         self.vq_model.load_state_dict(dict_s2["weight"], strict=False)
+        self.is_v2pro = getattr(self.vq_model, "is_v2pro", False)
 
-    def forward(self, text_seq, pred_semantic, ref_audio):
+    def forward(self, text_seq, pred_semantic, ref_audio, sv_emb=None):
         from onnx_export import spectrogram_torch
         refer = spectrogram_torch(
             ref_audio,
@@ -235,10 +225,54 @@ class VitsModel(torch.nn.Module):
             self.hps.data.win_length,
             center=False,
         )
-        if getattr(self.vq_model, "is_v2pro", False):
-            sv_emb = torch.zeros(1, 20480, dtype=torch.float32)
+        if self.is_v2pro:
+            if sv_emb is None:
+                raise ValueError("V2Pro/V2ProPlus export requires an sv_emb input")
             return self.vq_model(pred_semantic, text_seq, refer, sv_emb=sv_emb)[0, 0]
         return self.vq_model(pred_semantic, text_seq, refer)[0, 0]
+
+
+def export_speaker_model(sv_path, output_path):
+    print(f"[*] Exporting ERes2NetV2 speaker model from {sv_path} to {output_path}...")
+    eres2net_dir = os.path.join(gpt_sovits_repo, "GPT_SoVITS", "eres2net")
+    if eres2net_dir not in sys.path:
+        sys.path.insert(0, eres2net_dir)
+    from ERes2NetV2 import ERes2NetV2
+
+    checkpoint = torch.load(sv_path, map_location="cpu")
+    if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+        checkpoint = checkpoint["state_dict"]
+    checkpoint = {
+        key.removeprefix("module."): value for key, value in checkpoint.items()
+    }
+    model = ERes2NetV2(baseWidth=24, scale=4, expansion=4).float().eval()
+    model.load_state_dict(checkpoint)
+
+    class SpeakerWrapper(torch.nn.Module):
+        def __init__(self, embedding_model):
+            super().__init__()
+            self.embedding_model = embedding_model
+
+        def forward(self, fbank):
+            return self.embedding_model.forward3(fbank)
+
+    wrapper = SpeakerWrapper(model).eval()
+    dummy_fbank = torch.randn((1, 998, 80), dtype=torch.float32)
+    torch.onnx.export(
+        wrapper,
+        (dummy_fbank,),
+        output_path,
+        input_names=["fbank"],
+        output_names=["sv_emb"],
+        dynamic_axes={
+            "fbank": {0: "batch", 1: "frames"},
+            "sv_emb": {0: "batch"},
+        },
+        opset_version=17,
+        dynamo=False,
+        verbose=False,
+    )
+    print(f"[+] Speaker embedding model exported successfully: {output_path}")
 
 def export_t2s(gpt_path, vits_path, output_dir, version="v2", cnhubert_path=None):
     print(f"[*] Exporting T2S AR Models ({version}) from {gpt_path}...")
@@ -330,18 +364,34 @@ def export_vits(vits_path, output_dir, version="v2"):
     pred_semantic = torch.randint(0, 1024, (1, 1, 60), dtype=torch.long)
     ref_audio = torch.randn((1, 32000 * 3), dtype=torch.float32)
 
-    torch.onnx.export(
-        vits,
-        (text_seq, pred_semantic, ref_audio),
-        vits_onnx_path,
-        input_names=["text_seq", "pred_semantic", "ref_audio"],
-        output_names=["audio"],
-        dynamic_axes={
+    if vits.is_v2pro:
+        sv_emb = torch.zeros((1, 20480), dtype=torch.float32)
+        vits_inputs = (text_seq, pred_semantic, ref_audio, sv_emb)
+        input_names = ["text_seq", "pred_semantic", "ref_audio", "sv_emb"]
+        dynamic_axes = {
             "text_seq": {1: "text_length"},
             "pred_semantic": {2: "pred_length"},
             "ref_audio": {1: "audio_length"},
-            "audio": {1: "out_length"},
-        },
+            "sv_emb": {0: "sv_batch"},
+            "audio": {0: "out_length"},
+        }
+    else:
+        vits_inputs = (text_seq, pred_semantic, ref_audio)
+        input_names = ["text_seq", "pred_semantic", "ref_audio"]
+        dynamic_axes = {
+            "text_seq": {1: "text_length"},
+            "pred_semantic": {2: "pred_length"},
+            "ref_audio": {1: "audio_length"},
+            "audio": {0: "out_length"},
+        }
+
+    torch.onnx.export(
+        vits,
+        vits_inputs,
+        vits_onnx_path,
+        input_names=input_names,
+        output_names=["audio"],
+        dynamic_axes=dynamic_axes,
         opset_version=17,
         dynamo=False,
         verbose=False,
@@ -354,8 +404,24 @@ def main():
     parser.add_argument("--sovits-path", type=str, help="Path to SoVITS checkpoint (.pth)")
     parser.add_argument("--version", type=str, default="v2", help="Model version (v1, v2, v2Pro, v2ProPlus, v3, v4)")
     parser.add_argument("--custom-name", type=str, help="Custom model identifier (e.g. sandrone) to output directly into models/<custom-name>/")
-    parser.add_argument("--cnhubert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-hubert-base", help="CNHuBERT directory")
-    parser.add_argument("--bert-path", type=str, default="GPT_SoVITS/pretrained_models/chinese-roberta-wwm-ext-large", help="Chinese RoBERTa directory")
+    parser.add_argument(
+        "--cnhubert-path",
+        type=str,
+        default=os.path.join(gpt_sovits_repo, "GPT_SoVITS", "pretrained_models", "chinese-hubert-base"),
+        help="CNHuBERT directory",
+    )
+    parser.add_argument(
+        "--bert-path",
+        type=str,
+        default=os.path.join(
+            gpt_sovits_repo,
+            "GPT_SoVITS",
+            "pretrained_models",
+            "chinese-roberta-wwm-ext-large",
+        ),
+        help="Chinese RoBERTa directory",
+    )
+    parser.add_argument("--sv-path", type=str, default=os.path.join(gpt_sovits_repo, "GPT_SoVITS", "pretrained_models", "sv", "pretrained_eres2netv2w24s4ep4.ckpt"), help="ERes2NetV2 speaker checkpoint")
     parser.add_argument("--output-dir", type=str, default="models", help="Output directory for ONNX models")
 
     args = parser.parse_args()
@@ -395,7 +461,12 @@ def main():
     if os.path.exists(args.bert_path) and not os.path.exists(bert_out):
         export_roberta(args.bert_path, bert_out, tok_out)
 
-    # 3. T2S & VITS
+    # 3. Shared V2Pro/V2ProPlus speaker embedding model
+    speaker_out = os.path.join(args.output_dir, "sv.onnx")
+    if os.path.exists(args.sv_path) and not os.path.exists(speaker_out):
+        export_speaker_model(args.sv_path, speaker_out)
+
+    # 4. T2S & VITS
     if args.gpt_path and args.sovits_path:
         export_t2s(args.gpt_path, args.sovits_path, out_version_dir, version_clean, args.cnhubert_path)
         export_vits(args.sovits_path, out_version_dir, version_clean)
