@@ -24,7 +24,7 @@
                                      ▼
         ┌────────────────────────────────────────────────────────┐
         │            Pure Rust Text & G2P Frontend               │
-        │  • Symbols 表 (Symbols V1: 322, Symbols V2: 797)       │
+        │  • Symbols 表 (Symbols V1: 322, Symbols V2: 732)       │
         │  • 繁簡與數字正規化 (zh_norm, Tone Sandhi)             │
         │  • 中文/英文/日文/韓文/粵語 G2P 音標轉換               │
         │  • Hugging Face RoBERTa Tokenizer (tokenizers crate)   │
@@ -81,7 +81,7 @@
     │   └── routes.rs           # /audio/speech, /v1/audio/speech, /v1/models, /v1/voices, /health
     ├── text/                   # 純 Rust G2P 與文本前處理
     │   ├── mod.rs
-    │   ├── symbols.rs          # 完整 symbols_v1 (322) 與 symbols_v2 (797)
+    │   ├── symbols.rs          # 完整 symbols_v1 (322) 與 symbols_v2 (732)
     │   ├── normalizer.rs       # 數字與標點正規化
     │   ├── g2p.rs              # 拼音、變調、音素轉換
     │   ├── tokenizer.rs        # Hugging Face RoBERTa tokenizer 封裝
@@ -113,11 +113,11 @@
 | 版本代號 | 符號集 | 支援語言 | 合成器架構 | 輸出採樣率 | 備註 |
 |:---|:---|:---|:---|:---|:---|
 | **v1** | `symbols_v1` (322) | 中、英、日 | Flow + HiFiGAN | 32,000 Hz | 初代模型 |
-| **v2** | `symbols_v2` (797) | 中、英、日、粵、韓 | Flow + HiFiGAN (v2) | 32,000 Hz | 擴展語言與符號表 |
-| **v2Pro** | `symbols_v2` (797) | 中、英、日、粵、韓 | Enhanced VITS + SV | 32,000 Hz | 支援 SV 聲紋嵌入 |
-| **v2ProPlus** | `symbols_v2` (797) | 中、英、日、粵、韓 | Refined VITS + SV | 32,000 Hz | 強化音色分離度 |
-| **v3** | `symbols_v2` (797) | 中、英、日、粵、韓 | CFM DiT + BigVGAN | 24,000 Hz | 32-step ODE 解算 |
-| **v4** | `symbols_v2` (797) | 中、英、日、粵、韓 | CFM DiT + Vocoder | 48,000 Hz | 8~16 step 高速解算 |
+| **v2** | `symbols_v2` (732) | 中、英、日、粵、韓 | Flow + HiFiGAN (v2) | 32,000 Hz | 擴展語言與符號表 |
+| **v2Pro** | `symbols_v2` (732) | 中、英、日、粵、韓 | Enhanced VITS + SV | 32,000 Hz | 支援 SV 聲紋嵌入 |
+| **v2ProPlus** | `symbols_v2` (732) | 中、英、日、粵、韓 | Refined VITS + SV | 32,000 Hz | 強化音色分離度 |
+| **v3** | `symbols_v2` (732) | 中、英、日、粵、韓 | CFM DiT + BigVGAN | 24,000 Hz | 32-step ODE 解算 |
+| **v4** | `symbols_v2` (732) | 中、英、日、粵、韓 | CFM DiT + Vocoder | 48,000 Hz | 8~16 step 高速解算 |
 
 ---
 

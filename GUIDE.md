@@ -91,6 +91,10 @@ uv run tools/onnx_exporter.py \
     --output-dir "models"
 ```
 
+匯出 `v2Pro` / `v2ProPlus` 時也會在共用目錄產生 `models/sv.onnx`；如有需要可使用 `--sv-path` 指定 ERes2NetV2 checkpoint。
+
+已有舊版 V2Pro/V2ProPlus `vits.onnx` 時，可使用 `uv run tools/patch_vits_sv_input.py models/v2ProPlus/vits.onnx` 將零值 SV 常數替換為 `sv_emb` 輸入。
+
 ### 3.2 匯出參數說明
 
 | 參數 | 說明 | 預設值 |
@@ -126,6 +130,7 @@ default_version = "v2" # 預設使用的模型版本
 cnhubert_path = "models/chinese-hubert-base/cnhubert.onnx"
 bert_path = "models/chinese-roberta-wwm-ext-large/bert.onnx"
 bert_tokenizer_path = "models/chinese-roberta-wwm-ext-large/tokenizer.json"
+speaker_path = "models/sv.onnx"
 
 # ==========================================
 # 官方底模配置 (Base Models)
