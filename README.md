@@ -1,7 +1,7 @@
 # gptsovits-rs
 
 <p align="center">
-  <strong>高效能純 Rust 原生 GPT-SoVITS 推論引擎與 100% OpenAI TTS API 兼容伺服器</strong>
+  <strong>高效能純 Rust 原生 GPT-SoVITS 基於ONNX推論引擎與 100% OpenAI TTS API 兼容伺服器</strong>
 </p>
 
 <p align="center">
@@ -105,6 +105,8 @@ cd gptsovits-rs
 cargo build --release
 
 # 3. 啟動伺服器 (預設監聽 0.0.0.0:9880)
+# 註：config.toml 預設 [runtime] device = "cuda" (需 CUDA 13+ 與 cuBLAS 動態庫)
+# 若本機僅有 CPU 或舊版 CUDA，可將 config.toml 設為 device = "cpu" 或透過 Docker GPU 部署
 ./target/release/gptsovits-rs -c config.toml
 ```
 

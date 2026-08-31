@@ -34,6 +34,8 @@ cargo build --release
 
 ```bash
 # 使用預設設定 (config.toml, 埠口 9880)
+# 註：config.toml 預設啟用 CUDA 硬體加速 (device = "cuda")
+# 若本機環境僅有 CPU，可修改 config.toml 中 [runtime] device = "cpu"
 ./target/release/gptsovits-rs
 
 # 或自訂設定檔與監聽位址
@@ -159,6 +161,17 @@ model_version = "v2"
 model_dir = "models/hutao"
 sampling_rate = 32000
 ```
+
+#### 執行期參數表 (`[runtime]`)
+
+| 欄位名稱 | 型別 | 預設值 | 說明 |
+| :--- | :---: | :---: | :--- |
+| `device` | string | `"cuda"` | 推論硬體裝置：`"cuda"`（NVIDIA GPU 加速）或 `"cpu"`。若選 `"cuda"` 且 GPU 不可用，伺服器將明確報錯終止，不會靜默退回 CPU。 |
+| `cuda_device_id` | integer | `0` | 指定使用的 NVIDIA GPU 卡號（從 0 開始）。 |
+| `cuda_lib_dir` | string | `""` | 指定 CUDA 13 核心動態庫（`libcudart.so.13`, `libcublas.so.13` 等）所在目錄。若已在系統動態庫搜尋路徑中可留空。 |
+| `cudnn_lib_dir` | string | `""` | 指定 cuDNN 動態庫（`libcudnn.so.9` 等）所在目錄。若已在系統動態庫搜尋路徑中可留空。 |
+| `intra_threads` | integer | `4` | 每個 ONNX 推論運算元內部之執行緒並行數（Intra-op threads）。 |
+| `inter_threads` | integer | `2` | ONNX 計算圖運算元之間之並行調度執行緒數（Inter-op threads）。 |
 
 ### 4.2 音色預設 (`voices.toml`)
 
@@ -384,31 +397,40 @@ main();
 
 ---
 
-## 8. Docker 與 Docker Compose 容器化部署
+## 9. Docker 與 Docker Compose 容器化部署
 
-### 8.1 使用 Docker Compose 一鍵啟動
+### 9.1 使用 Docker Compose 一鍵啟動 (推薦 GPU 部署)
+
+專案預設之 Docker 映像檔基於 `nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04` 構建，內建完整的 CUDA 13 與 cuDNN 運行時，無需在本機安裝額外的 CUDA 動態庫。
 
 ```bash
+# 前置條件：確保宿主機已安裝 NVIDIA Driver 與 nvidia-container-toolkit
+# 驗證 Docker 可存取 GPU
+docker run --rm --gpus all nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 nvidia-smi
+
 # 1. 建立掛載目錄並準備模型
 mkdir -p models voices
 
-# 2. 啟動服務 (自動下載或本機建置)
-docker compose up -d
+# 2. 建置並背景啟動服務 (自動啟用 GPU 加速)
+docker compose up -d --build
 
 # 3. 檢查容器執行狀態與日誌
 docker compose logs -f
 ```
 
-### 8.2 從 GitHub Container Registry (ghcr.io) 拉取映像檔
+### 9.2 從 GitHub Container Registry (ghcr.io) 拉取映像檔
 
 ```bash
 # 拉取最新預建置映像檔
 docker pull ghcr.io/earthlyeric6/gptsovits-rs:latest
 
-# 直接運行容器
+# 直接運行容器 (傳遞 GPU 裝置)
 docker run -d \
   --name gptsovits-rs \
   -p 9880:9880 \
+  --gpus all \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  -e NVIDIA_DRIVER_CAPABILITIES=compute,utility \
   -v $(pwd)/config.toml:/app/config.toml:ro \
   -v $(pwd)/voices.toml:/app/voices.toml:ro \
   -v $(pwd)/models:/app/models \
@@ -417,8 +439,35 @@ docker run -d \
   ghcr.io/earthlyeric6/gptsovits-rs:latest
 ```
 
-### 8.3 自行建置 Docker 映像檔
+### 9.3 自行建置 Docker 映像檔
 
 ```bash
 docker build -t gptsovits-rs:latest .
 ```
+
+---
+
+## 10. 常見問題與排錯指南 (Troubleshooting)
+
+### Q1: 啟動時提示 `libcublasLt.so.13: cannot open shared object file` 怎麼辦？
+* **原因**：本機發布的 `ort` 2.x CUDA 發行包鏈接至 CUDA 13 核心動態庫，而宿主機環境缺少 CUDA 13 函式庫（例如宿主機僅安裝 CUDA 12.x）。
+* **處置方案**：
+  1. **（推薦）使用 Docker Compose 部署**：執行 `docker compose up -d --build`，容器內建完整的 CUDA 13 + cuDNN 環境，開箱即用。
+  2. **手動指定路徑**：若有 CUDA 13 庫檔案，可在 `config.toml` 中配置 `[runtime] cuda_lib_dir = "/path/to/cuda13/lib"`。
+  3. **切換為純 CPU 模式**：在 `config.toml` 中將 `[runtime] device = "cpu"` 即可於純 CPU 模式下順暢運行。
+
+### Q2: 如何確認模型是否有真正使用 GPU 進行推論？
+啟動伺服器後發送合成請求，並在終端機執行：
+```bash
+watch -n 1 nvidia-smi
+```
+在推論合成期間，應可觀察到 `gptsovits-rs` 程序佔用 GPU 顯存（約 1.5GB ~ 3GB，視模型而定），且 GPU-Util 數值有所跳動。若日誌顯示 `ONNX Runtime CUDAExecutionProvider registered` 則代表 GPU 加速已成功啟用。
+
+### Q3: V2Pro / V2ProPlus 模型合成報錯 `V2Pro/V2ProPlus VITS requires a speaker embedding`
+* **原因**：V2Pro / V2ProPlus 架構需要 `sv.onnx` 聲紋特徵抽取器，且 `vits.onnx` 圖需暴露 `sv_emb`（形狀 `[1, 20480]`）輸入。
+* **處置方案**：請確認 `models/sv.onnx` 存在，並使用 `uv run tools/patch_vits_sv_input.py models/your_model/vits.onnx` 修補該模型。
+
+### Q4: 合成請求延遲較高，可能的原因是什麼？
+1. **未開啟 GPU 加速**：請確認 `config.toml` 中 `device = "cuda"` 且容器已正確掛載 GPU。
+2. **文本切分過多**：預設的 `cut5` 切分策略會為每個標點符號建立獨立的自回歸解碼段。如為大篇幅朗讀，可選用 `cut2`（湊 50 字切分）減少解碼次數。
+3. **音訊編碼格式**：預設輸出 `mp3` 會呼叫系統 `ffmpeg` 轉碼；若追求極致低延遲，可傳入 `"response_format": "wav"` 或 `"pcm"` 走純 Rust 直出編碼。

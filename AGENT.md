@@ -45,6 +45,12 @@
   1. **字串格式**（如 `"default"`, `"sandrone"`）：從 `voices.toml` 中查找預先設定好的 `ref_audio_path`、`prompt_text`、`prompt_lang` 與 `model_version`。
   2. **自訂物件格式**（如 `{"ref_audio_path": "...", "prompt_text": "...", "prompt_lang": "zh", "text_lang": "zh"}`）：動態傳入參考音訊與提示詞進行零樣本複製（Zero-Shot Cloning）。
 
+### 2.4 硬體加速與 ONNX Runtime 執行期規範
+- **全域環境初始化 (`ort::init()`)**：必須在建立任何 ONNX `Session` 之前完成。若選擇 `device = "cuda"`，會預先載入 CUDA/cuDNN 動態庫並註冊 `CUDAExecutionProvider`（啟用 TF32 加速）。
+- **Fail-Fast 機制**：當 `device = "cuda"` 時，若 CUDA Provider 不可用或動態庫缺失，伺服器會立即報錯終止，**嚴禁靜默退回 CPU**，確保效能與排錯透明度。
+- **執行緒配置**：由 `config.toml` 的 `[runtime] intra_threads` 與 `inter_threads` 統一傳入各模型 session，不使用寫死常數。
+- **Docker 運行時**：基於 `nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04`，映像檔內建完整 CUDA 13/cuDNN 函式庫與 ONNX Runtime provider `.so`。
+
 ---
 
 ## 3. 開發與維護指令
@@ -103,8 +109,8 @@ python tools/onnx_exporter.py \
 
 ### 3.5 Docker 容器化部署
 ```bash
-# 使用 Docker Compose 啟動
-docker compose up -d
+# 使用 Docker Compose 啟動 (內建 CUDA 13/cuDNN GPU 加速)
+docker compose up -d --build
 
 # 自行構建 Docker 映像檔
 docker build -t gptsovits-rs:latest .

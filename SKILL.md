@@ -22,9 +22,10 @@ rustc --version
 # uv (PEP 723 script runner, used for model download/export)
 uv --version
 
-# Docker / Docker Compose (container deployment)
+# Docker / Docker Compose & NVIDIA Container Toolkit (for GPU container deployment)
 docker --version
 docker compose version
+docker run --rm --gpus all nvidia/cuda:13.0.0-cudnn-runtime-ubuntu24.04 nvidia-smi
 
 # Audio encoding dependency (ffmpeg; bundled in the container image)
 ffmpeg -version
@@ -201,6 +202,7 @@ Do not run `git commit` / `git push` unless the user explicitly asks.
 
 ## 10. Troubleshooting
 
+- **`libcublasLt.so.13: cannot open shared object file` (local run)**: the compiled `ort` 2.x CUDA package links against CUDA 13. Use `docker compose up -d --build` (which embeds CUDA 13 + cuDNN), set `[runtime] cuda_lib_dir` to point at your CUDA 13 libraries, or set `device = "cpu"` in `config.toml`.
 - **`sv_emb` missing / wrong shape**: the VITS graph has no speaker input; re-export or run `tools/patch_vits_sv_input.py`.
 - **Model load warnings**: `T2S/VITS/CFM/CNHuBERT/RoBERTa ONNX model file not found` means the file at that path is missing; check `config.toml` paths and the model directory.
 - **`/health` fails**: confirm the container is running and `docker compose ps` shows healthy.
