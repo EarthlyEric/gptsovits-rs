@@ -77,14 +77,30 @@ COPY --from=builder /usr/src/gptsovits-rs/target/release/gptsovits-rs /usr/local
 # Keep provider libraries next to the executable, where ONNX Runtime discovers them.
 COPY --from=builder /usr/src/gptsovits-rs/target/release/libonnxruntime_providers_*.so /usr/local/bin/
 
-# Copy custom CUDA ONNX Runtime libraries if provided in build context (e.g. from GitHub Actions CI).
-COPY ort_libs/ /usr/local/lib/
+# Prebuilt CUDA-enabled ONNX Runtime libraries (built locally with
+# tools/onnxruntime_builder/build_ort_cuda.sh and hosted on Hugging Face).
+#
+# TODO: fill in your HF download URL here (use the /resolve/main/ link):
+#   e.g. https://huggingface.co/<user>/<repo>/resolve/main/onnxruntime-cuda12.8-1.28.0-linux-x86_64.tar.gz
+ARG ORT_LIBS_URL=""
 
-# CI artifacts are copied to /usr/local/lib first, then moved to the same directory
-# as the executable for the provider loader.
-RUN for provider in /usr/local/lib/libonnxruntime_providers_*.so; do \
-        if [ -e "$provider" ]; then mv "$provider" /usr/local/bin/; fi; \
-    done
+# Fail fast when the URL is missing, then download and extract the flat
+# tar.gz into /usr/local/lib. Provider libraries are moved next to the
+# executable, where the ONNX Runtime provider loader discovers them.
+#RUN set -eu; \
+#    if [ -z "$ORT_LIBS_URL" ]; then \
+#        echo "ERROR: ORT_LIBS_URL is empty." >&2; \
+#        echo "       Build with --build-arg ORT_LIBS_URL=<HuggingFace resolve URL>" >&2; \
+#        echo "       The tar.gz is produced by tools/onnxruntime_builder/build_ort_cuda.sh" >&2; \
+#        exit 1; \
+#    fi; \
+#    echo "==> Downloading ONNX Runtime libraries from $ORT_LIBS_URL"; \
+#    curl -fL --retry 5 --retry-delay 5 -o /tmp/ort-libs.tar.gz "$ORT_LIBS_URL"; \
+#    tar -xzf /tmp/ort-libs.tar.gz -C /usr/local/lib; \
+#    rm -f /tmp/ort-libs.tar.gz; \
+#    for provider in /usr/local/lib/libonnxruntime_providers_*.so; do \
+#        if [ -e "$provider" ]; then mv "$provider" /usr/local/bin/; fi; \
+#    done
 
 # Copy default configurations
 COPY config.toml /app/config.toml
